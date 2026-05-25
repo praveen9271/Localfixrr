@@ -1,0 +1,30 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node -c app.js && node -c server.js && node -c controllers/authController.js && node -c controllers/userController.js && node -c controllers/providerController.js && node -c controllers/adminController.js && node -c controllers/newsletterController.js && node -c controllers/chatController.js && node -c routes/authRoutes.js && node -c routes/userRoutes.js && node -c routes/providerRoutes.js && node -c routes/adminRoutes.js && node -c routes/newsletterRoutes.js && node -c routes/chatRoutes.js && node -c services/geminiService.js",
+    "seed": "node scripts/seedServiceProviders.js",
+    "seed:admin": "node scripts/seedAdminDashboard.js",
+    "add-reviews": "node scripts/addReviews.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.2.0",
+    "mongoose": "^9.5.0",
+    "nodemailer": "^8.0.7"
+  }
+}
