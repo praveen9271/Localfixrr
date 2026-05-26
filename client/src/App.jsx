@@ -211,6 +211,19 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
   const formattedPhone = phoneDigits.replace(/(\d{5})(\d{0,5})/, (_, first, second) =>
     second ? `${first} ${second}` : first,
   )
+
+  const getRegistrationPayload = () => ({
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    phone: phoneDigits,
+    address: address.trim(),
+    password,
+    confirmPassword,
+    role,
+    businessName: role === 'service_provider' ? businessName.trim() : undefined,
+    serviceCategory: role === 'service_provider' ? serviceCategory : undefined,
+  })
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     
@@ -228,17 +241,7 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
     setLoading(true)
     
     try {
-      const response = await startRegistration({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phoneDigits,
-        address: address.trim(),
-        password,
-        confirmPassword,
-        role,
-        businessName: role === 'service_provider' ? businessName.trim() : undefined,
-        serviceCategory: role === 'service_provider' ? serviceCategory : undefined,
-      })
+      const response = await startRegistration(getRegistrationPayload())
       onToast(response.message)
       setRegistrationSession({ email: response.email, phone: response.phone })
       setStep('email')
@@ -295,9 +298,28 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
   const handleResend = async () => {
     setLoading(true)
     try {
+      if (!registrationSession?.email || !registrationSession?.phone) {
+        const response = await startRegistration(getRegistrationPayload())
+        setRegistrationSession({ email: response.email, phone: response.phone })
+        onToast(response.message)
+        return
+      }
+
       const response = await resendRegistrationOtp(registrationSession)
       onToast(response.message)
     } catch (error) {
+      if (error.response?.status === 404) {
+        try {
+          const response = await startRegistration(getRegistrationPayload())
+          setRegistrationSession({ email: response.email, phone: response.phone })
+          setEmailOtp('')
+          onToast(response.message)
+          return
+        } catch (restartError) {
+          onToast(restartError.response?.data?.message || 'Please check your details and request a new OTP')
+          return
+        }
+      }
       onToast(error.response?.data?.message || 'Unable to resend OTP')
     } finally {
       setLoading(false)
