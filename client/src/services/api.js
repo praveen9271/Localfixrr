@@ -1,22 +1,44 @@
 import axios from 'axios'
 
-const LOCAL_API_URL = 'http://localhost:5000/api'
-const PRODUCTION_API_URL = 'https://localfixr.onrender.com/api'
+const AUTH_STORAGE_KEYS = ['token', 'user']
+
+const readStorage = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+const removeStorage = (key) => {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Ignore storage failures in restricted browser contexts.
+  }
+}
 
 const normalizeApiUrl = (url) => {
   const cleanUrl = String(url || '').trim().replace(/\/+$/, '')
-  if (!cleanUrl) return LOCAL_API_URL
+  if (!cleanUrl) return '/api'
   return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`
 }
 
 const getApiBaseUrl = () => {
-  const envApiUrl = import.meta.env.VITE_API_URL
-  const fallbackUrl = import.meta.env.PROD ? PRODUCTION_API_URL : LOCAL_API_URL
-  return normalizeApiUrl(envApiUrl || fallbackUrl)
+  const {
+    VITE_API_URL,
+    VITE_LOCAL_API_URL,
+    VITE_PRODUCTION_API_URL,
+    PROD,
+  } = import.meta.env
+
+  const modeApiUrl = PROD ? VITE_PRODUCTION_API_URL : VITE_LOCAL_API_URL
+  return normalizeApiUrl(VITE_API_URL || modeApiUrl)
 }
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +47,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = readStorage('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -40,13 +62,18 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.code === 'ECONNABORTED') {
+      error.userMessage = 'The server took too long to respond. Please try again.'
+    } else if (!error.response) {
+      error.userMessage = 'Unable to reach the server. Check your connection or API deployment.'
+    }
+
     if (error.response?.status === 401) {
       const passwordResetPaths = ['/forgot-password', '/verify-otp', '/reset-password']
       if (passwordResetPaths.includes(window.location.pathname)) {
         return Promise.reject(error)
       }
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      AUTH_STORAGE_KEYS.forEach(removeStorage)
       if (window.location.pathname !== '/login') {
         window.location.assign('/login')
       }

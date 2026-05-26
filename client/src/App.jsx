@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router'
 import Footer from './component/Footer'
 import Navbar from './component/Navbar'
@@ -53,8 +53,8 @@ function ScrollManager() {
   useEffect(() => {
     if (location.hash) {
       const id = location.hash.slice(1)
-      setTimeout(() => scrollToSection(id), 0)
-      return
+      const timer = setTimeout(() => scrollToSection(id), 0)
+      return () => clearTimeout(timer)
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -594,11 +594,18 @@ function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const toastTimerRef = useRef(null)
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+  }, [])
 
   const showToast = (message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setToast(message)
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast('')
+      toastTimerRef.current = null
     }, 4000)
   }
 

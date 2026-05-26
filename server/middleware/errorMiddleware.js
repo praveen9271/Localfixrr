@@ -5,8 +5,13 @@ const notFound = (req, res, next) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let statusCode = err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   let message = err.message || 'Server error';
+
+  if (err.message === 'Not allowed by CORS') {
+    statusCode = 403;
+    message = 'This origin is not allowed to access the API';
+  }
 
   if (err.name === 'CastError') {
     statusCode = 400;
@@ -24,9 +29,25 @@ const errorHandler = (err, req, res, next) => {
     message = Object.values(err.errors).map((item) => item.message).join(', ');
   }
 
+  if (err.name === 'JsonWebTokenError') {
+    statusCode = 401;
+    message = 'Invalid authentication token';
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    statusCode = 401;
+    message = 'Authentication token expired';
+  }
+
+  if (err.type === 'entity.parse.failed') {
+    statusCode = 400;
+    message = 'Invalid JSON payload';
+  }
+
   res.status(statusCode).json({
     success: false,
     message,
+    requestId: req.id,
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
   });
 };

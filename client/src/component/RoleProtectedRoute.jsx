@@ -2,13 +2,15 @@ import { Navigate } from 'react-router';
 import { isAuthenticated, getUserRole } from '../services/authService';
 
 const RoleProtectedRoute = ({ children, allowedRoles }) => {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [];
+
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
   const userRole = getUserRole();
   
-  if (!allowedRoles.includes(userRole)) {
+  if (!userRole || !roles.includes(userRole)) {
     // Redirect to appropriate dashboard based on role
     if (userRole === 'admin') {
       return <Navigate to="/dashboard/admin" replace />;

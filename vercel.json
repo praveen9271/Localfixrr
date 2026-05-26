@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd client && npm run build",
+  "installCommand": "cd client && npm install",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://localfixr.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
