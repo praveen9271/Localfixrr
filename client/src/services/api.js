@@ -1,7 +1,22 @@
 import axios from 'axios'
 
+const LOCAL_API_URL = 'http://localhost:5000/api'
+const PRODUCTION_API_URL = 'https://localfixr.onrender.com/api'
+
+const normalizeApiUrl = (url) => {
+  const cleanUrl = String(url || '').trim().replace(/\/+$/, '')
+  if (!cleanUrl) return LOCAL_API_URL
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`
+}
+
+const getApiBaseUrl = () => {
+  const envApiUrl = import.meta.env.VITE_API_URL
+  const fallbackUrl = import.meta.env.PROD ? PRODUCTION_API_URL : LOCAL_API_URL
+  return normalizeApiUrl(envApiUrl || fallbackUrl)
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

@@ -13,14 +13,31 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-const allowedOrigins = String(process.env.CLIENT_URL || 'http://localhost:5173')
+const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/+$/, '');
+const allowedOrigins = String(process.env.CLIENT_URL || process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://localhost:3000')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
+const allowVercelOrigins = process.env.ALLOW_VERCEL_ORIGINS !== 'false';
+
+const isAllowedOrigin = (origin) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (allowedOrigins.includes(normalizedOrigin)) return true;
+
+  if (allowVercelOrigins) {
+    try {
+      return new URL(normalizedOrigin).hostname.endsWith('.vercel.app');
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+};
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
