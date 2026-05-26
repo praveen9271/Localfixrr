@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+import crypto from 'node:crypto';
+import nodemailer from 'nodemailer';
 
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = Number(process.env.OTP_TTL_MINUTES || 10);
@@ -8,6 +8,8 @@ const OTP_MAX_RESENDS = Number(process.env.OTP_MAX_RESENDS || 5);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
 
+const getEnv = (key) => String(process.env[key] || '').trim();
+
 const generateOtp = () => String(crypto.randomInt(0, 1000000)).padStart(OTP_LENGTH, '0');
 
 const isProduction = () => process.env.NODE_ENV === 'production';
@@ -15,7 +17,7 @@ const isProduction = () => process.env.NODE_ENV === 'production';
 const envFlag = (value) => String(value || '').trim().toLowerCase() === 'true';
 
 const getSmtpPort = () => {
-  const port = Number(process.env.SMTP_PORT);
+  const port = Number(getEnv('SMTP_PORT'));
   if (Number.isInteger(port) && port > 0) return port;
   return envFlag(process.env.SMTP_SECURE) ? 465 : 587;
 };
@@ -59,17 +61,21 @@ const canResend = (pending) => {
 };
 
 const createTransport = () => {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  const host = getEnv('SMTP_HOST');
+  const user = getEnv('SMTP_USER');
+  const pass = getEnv('SMTP_PASS');
+
+  if (!host || !user || !pass) {
     return null;
   }
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host,
     port: getSmtpPort(),
     secure: envFlag(process.env.SMTP_SECURE),
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user,
+      pass,
     },
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
@@ -79,7 +85,7 @@ const createTransport = () => {
 
 const sendEmailOtp = async ({ email, name, otp }) => {
   const transport = createTransport();
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
 
   if (!transport || !from) {
     if (isProduction()) {
@@ -118,7 +124,7 @@ const sendEmailOtp = async ({ email, name, otp }) => {
 
 const sendResetPasswordOtp = async ({ email, name, otp }) => {
   const transport = createTransport();
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
 
   if (!transport || !from) {
     if (isProduction()) {
@@ -167,7 +173,7 @@ const sendResetPasswordOtp = async ({ email, name, otp }) => {
 
 const sendNewsletterSubscriptionEmail = async ({ email }) => {
   const transport = createTransport();
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
 
   if (!transport || !from) {
     if (isProduction()) {
@@ -213,12 +219,13 @@ const sendNewsletterSubscriptionEmail = async ({ email }) => {
   return { sent: true };
 };
 
-module.exports = {
+export {
   OTP_MAX_ATTEMPTS,
   OTP_MAX_RESENDS,
   OTP_RESEND_SECONDS,
   OTP_TTL_MINUTES,
   canResend,
+  createTransport,
   generateOtp,
   getOtpExpiry,
   hashOtp,

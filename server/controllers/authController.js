@@ -1,11 +1,11 @@
-const User = require('../models/User');
-const Provider = require('../models/Provider');
-const PendingRegistration = require('../models/PendingRegistration');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-const { normalizeServiceCategory } = require('../config/serviceCategories');
-const {
+import User from '../models/User.js';
+import Provider from '../models/Provider.js';
+import PendingRegistration from '../models/PendingRegistration.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import { normalizeServiceCategory } from '../config/serviceCategories.js';
+import {
   OTP_MAX_ATTEMPTS,
   OTP_MAX_RESENDS,
   OTP_RESEND_SECONDS,
@@ -16,7 +16,7 @@ const {
   isOtpMatch,
   sendEmailOtp,
   sendResetPasswordOtp,
-} = require('../services/otpService');
+} from '../services/otpService.js';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'localfixr-dev-secret';
 
@@ -666,7 +666,6 @@ const getMe = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { name, phone, address } = req.body;
-    const User = require('../models/User');
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -697,8 +696,6 @@ const changePassword = async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
-    const User = require('../models/User');
-    const bcrypt = require('bcryptjs');
     const user = await User.findById(req.user.id).select('+password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -716,7 +713,7 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   completeRegistration,
   resendRegistrationOtp,
   registerUser,

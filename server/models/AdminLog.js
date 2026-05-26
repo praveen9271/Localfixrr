@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const adminLogSchema = new mongoose.Schema(
   {
@@ -32,4 +32,4 @@ const adminLogSchema = new mongoose.Schema(
 adminLogSchema.index({ adminId: 1, createdAt: -1 });
 adminLogSchema.index({ targetCollection: 1, createdAt: -1 });
 
-module.exports = mongoose.model('AdminLog', adminLogSchema);
+export default mongoose.model('AdminLog', adminLogSchema);

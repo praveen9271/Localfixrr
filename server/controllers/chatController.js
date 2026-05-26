@@ -1,7 +1,7 @@
-const crypto = require('crypto');
-const mongoose = require('mongoose');
-const Chat = require('../models/Chat');
-const { getGeminiReply } = require('../services/geminiService');
+import crypto from 'node:crypto';
+import mongoose from 'mongoose';
+import Chat from '../models/Chat.js';
+import { getGeminiReply } from '../services/geminiService.js';
 
 const cleanMessage = (value) =>
   String(value || '')
@@ -83,6 +83,6 @@ const sendChatMessage = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   sendChatMessage,
 };

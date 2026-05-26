@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Provider = require('../models/Provider');
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
+import Provider from '../models/Provider.js';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'localfixr-dev-secret';
 
@@ -84,4 +84,4 @@ const adminOrProvider = (req, res, next) => {
   }
 };
 
-module.exports = { protect, adminOnly, providerOnly, userOnly, adminOrProvider };
+export { protect, adminOnly, providerOnly, userOnly, adminOrProvider };

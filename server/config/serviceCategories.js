@@ -13,7 +13,7 @@ const normalizeServiceCategory = (value) => {
   return SERVICE_CATEGORIES.find((category) => category.toLowerCase() === normalized) || '';
 };
 
-module.exports = {
+export {
   SERVICE_CATEGORIES,
   normalizeServiceCategory,
 };

@@ -119,4 +119,4 @@ const fallbackServices = [
   },
 ];
 
-module.exports = fallbackServices;
+export default fallbackServices;

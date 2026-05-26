@@ -108,6 +108,6 @@ const getGeminiReply = async ({ message, history = [] }) => {
   };
 };
 
-module.exports = {
+export {
   getGeminiReply,
 };

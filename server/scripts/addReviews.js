@@ -1,10 +1,12 @@
-require('dotenv').config();
-const mongoose = require('mongoose');
-const User = require('../models/User');
-const Provider = require('../models/Provider');
-const Service = require('../models/Service');
-const Review = require('../models/Review');
-const Booking = require('../models/Booking');
+import dotenv from 'dotenv';
+
+dotenv.config();
+import mongoose from 'mongoose';
+import User from '../models/User.js';
+import Provider from '../models/Provider.js';
+import Service from '../models/Service.js';
+import Review from '../models/Review.js';
+import Booking from '../models/Booking.js';
 
 const reviews = [
   {

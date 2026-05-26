@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const {
+import {
   getAllServices,
   getServiceById,
   createBooking,
@@ -8,8 +8,8 @@ const {
   cancelBooking,
   getUserStats,
   createReview
-} = require('../controllers/userController');
-const { protect, userOnly } = require('../middleware/roleMiddleware');
+} from '../controllers/userController.js';
+import { protect, userOnly } from '../middleware/roleMiddleware.js';
 
 // All routes are protected and user-only
 router.use(protect);
@@ -30,4 +30,4 @@ router.post('/reviews', createReview);
 // Dashboard stats
 router.get('/stats', getUserStats);
 
-module.exports = router;
+export default router;

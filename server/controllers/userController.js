@@ -1,10 +1,10 @@
-const Service = require('../models/Service');
-const Booking = require('../models/Booking');
-const Review = require('../models/Review');
-const Provider = require('../models/Provider');
-const mongoose = require('mongoose');
-const fallbackServices = require('../data/fallbackServices');
-const { buildPagination, getPagination } = require('../utils/pagination');
+import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
+import Provider from '../models/Provider.js';
+import mongoose from 'mongoose';
+import fallbackServices from '../data/fallbackServices.js';
+import { buildPagination, getPagination } from '../utils/pagination.js';
 
 const populateServiceProvider = {
   path: 'provider',
@@ -402,7 +402,7 @@ const getServiceReviews = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   getAllServices,
   getServiceById,
   createBooking,

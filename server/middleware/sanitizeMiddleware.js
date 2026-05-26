@@ -16,4 +16,4 @@ const sanitizeBody = (req, res, next) => {
   next();
 };
 
-module.exports = { sanitizeBody, sanitizeValue };
+export { sanitizeBody, sanitizeValue };

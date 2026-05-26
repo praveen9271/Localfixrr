@@ -21,22 +21,27 @@ const welcomeMessage = {
 
 const safeJsonParse = (value, fallback) => {
   try {
-    return JSON.parse(value) || fallback
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : fallback
   } catch {
     return fallback
   }
 }
 
 const createSessionId = () => {
-  if (crypto?.randomUUID) return crypto.randomUUID()
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
   return `chat_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
-const formatTime = (value) =>
-  new Intl.DateTimeFormat('en-IN', {
+const timeFormatter = new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(value))
+  })
+
+const formatTime = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : timeFormatter.format(date)
+}
 
 function TypingDots() {
   return (

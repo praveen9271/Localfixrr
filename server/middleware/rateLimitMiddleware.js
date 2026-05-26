@@ -39,7 +39,7 @@ const chatRateLimit = createRateLimiter({
   message: 'Too many chat messages. Please wait a moment and try again.',
 });
 
-module.exports = {
+export {
   authRateLimit,
   chatRateLimit,
   createRateLimiter,

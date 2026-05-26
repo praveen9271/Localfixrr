@@ -1,13 +1,13 @@
-const User = require('../models/User');
-const Service = require('../models/Service');
-const Booking = require('../models/Booking');
-const Provider = require('../models/Provider');
-const Review = require('../models/Review');
-const Category = require('../models/Category');
-const Notification = require('../models/Notification');
-const Report = require('../models/Report');
-const AdminLog = require('../models/AdminLog');
-const { buildPagination, getPagination } = require('../utils/pagination');
+import User from '../models/User.js';
+import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
+import Provider from '../models/Provider.js';
+import Review from '../models/Review.js';
+import Category from '../models/Category.js';
+import Notification from '../models/Notification.js';
+import Report from '../models/Report.js';
+import AdminLog from '../models/AdminLog.js';
+import { buildPagination, getPagination } from '../utils/pagination.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const BOOKING_STATUSES = ['pending', 'confirmed', 'accepted', 'in_progress', 'completed', 'cancelled', 'rejected'];
@@ -495,7 +495,7 @@ const exportUsersCsv = asyncHandler(async (_req, res) => {
   res.status(200).send(csv);
 });
 
-module.exports = {
+export {
   getAllUsers,
   getAllProviders,
   getUserById,

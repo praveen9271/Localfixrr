@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const {
+import {
   getAllUsers,
   getAllProviders,
   getUserById,
@@ -25,8 +25,8 @@ const {
   generateReport,
   getAdminLogs,
   exportUsersCsv,
-} = require('../controllers/adminController');
-const { protect, adminOnly } = require('../middleware/roleMiddleware');
+} from '../controllers/adminController.js';
+import { protect, adminOnly } from '../middleware/roleMiddleware.js';
 
 // All routes are protected and admin-only
 router.use(protect);
@@ -72,4 +72,4 @@ router.get('/logs', getAdminLogs);
 // Dashboard stats
 router.get('/stats', getDashboardStats);
 
-module.exports = router;
+export default router;

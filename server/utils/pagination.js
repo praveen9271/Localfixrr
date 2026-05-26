@@ -13,4 +13,4 @@ const buildPagination = (page, limit, total) => ({
   pages: Math.ceil(total / limit) || 1,
 });
 
-module.exports = { getPagination, buildPagination };
+export { getPagination, buildPagination };

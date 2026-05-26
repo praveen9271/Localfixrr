@@ -1,9 +1,9 @@
-const express = require('express');
-const { sendChatMessage } = require('../controllers/chatController');
-const { chatRateLimit } = require('../middleware/rateLimitMiddleware');
+import express from 'express';
+import { sendChatMessage } from '../controllers/chatController.js';
+import { chatRateLimit } from '../middleware/rateLimitMiddleware.js';
 
 const router = express.Router();
 
 router.post('/', chatRateLimit, sendChatMessage);
 
-module.exports = router;
+export default router;

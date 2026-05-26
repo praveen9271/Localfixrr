@@ -1,4 +1,4 @@
-const { sendNewsletterSubscriptionEmail } = require('../services/otpService');
+import { sendNewsletterSubscriptionEmail } from '../services/otpService.js';
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -30,6 +30,6 @@ const subscribeNewsletter = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   subscribeNewsletter,
 };

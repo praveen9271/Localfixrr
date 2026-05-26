@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const serviceSchema = new mongoose.Schema({
   title: {
@@ -68,4 +68,4 @@ const serviceSchema = new mongoose.Schema({
 serviceSchema.index({ title: 'text', description: 'text', category: 'text' });
 serviceSchema.index({ provider: 1, status: 1 });
 
-module.exports = mongoose.model('Service', serviceSchema);
+export default mongoose.model('Service', serviceSchema);

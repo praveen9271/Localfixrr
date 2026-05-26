@@ -1,6 +1,24 @@
-const mongoose = require('mongoose');
+import dns from 'node:dns';
+import mongoose from 'mongoose';
 
 mongoose.set('strictQuery', true);
+dns.setDefaultResultOrder('ipv4first');
+
+const configureDnsServers = () => {
+  const dnsServers = String(process.env.DNS_SERVERS || '')
+    .split(',')
+    .map((server) => server.trim())
+    .filter(Boolean);
+
+  if (!dnsServers.length) return;
+
+  try {
+    dns.setServers(dnsServers);
+    console.log(`Using custom DNS servers: ${dnsServers.join(', ')}`);
+  } catch (error) {
+    console.warn(`Invalid DNS_SERVERS value ignored: ${error.message}`);
+  }
+};
 
 const connectDB = async () => {
   const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
@@ -10,6 +28,7 @@ const connectDB = async () => {
   }
 
   try {
+    configureDnsServers();
     const timeoutMs = Number(process.env.MONGODB_TIMEOUT_MS || 30000);
     const connection = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: timeoutMs,
@@ -22,10 +41,10 @@ const connectDB = async () => {
     console.log(`MongoDB connected: ${connection.connection.host}`);
   } catch (error) {
     if (error.name === 'MongooseServerSelectionError') {
-      error.message = `${error.message}\n\nCheck that your MongoDB Atlas cluster is running and that your current IP address is allowed in Atlas Network Access.`;
+      error.message = `${error.message}\n\nCheck MongoDB Atlas Network Access. Add your Render service outbound IP ranges to the Atlas IP Access List, or temporarily allow 0.0.0.0/0 only while testing. If DNS lookup fails, set DNS_SERVERS=8.8.8.8,1.1.1.1 in Render.`;
     }
     throw error;
   }
 };
 
-module.exports = connectDB;
+export default connectDB;

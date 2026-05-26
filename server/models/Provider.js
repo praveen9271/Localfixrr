@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const providerSchema = new mongoose.Schema(
   {
@@ -75,4 +75,4 @@ const providerSchema = new mongoose.Schema(
 
 providerSchema.index({ businessName: 'text', bio: 'text', skills: 'text', serviceAreas: 'text' });
 
-module.exports = mongoose.model('Provider', providerSchema);
+export default mongoose.model('Provider', providerSchema);

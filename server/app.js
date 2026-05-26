@@ -1,10 +1,19 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-const { sanitizeBody } = require('./middleware/sanitizeMiddleware');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { notFound, errorHandler } from './middleware/errorMiddleware.js';
+import { sanitizeBody } from './middleware/sanitizeMiddleware.js';
+import mongoose from 'mongoose';
+import authRoutes from './routes/authRoutes.js';
+import serviceRoutes from './routes/serviceRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import providerRoutes from './routes/providerRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import newsletterRoutes from './routes/newsletterRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import { createTransport } from './services/otpService.js';
 
 // Load env vars
 dotenv.config({ quiet: true });
@@ -67,13 +76,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(sanitizeBody);
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/services', require('./routes/serviceRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/provider', require('./routes/providerRoutes'));
-app.use('/api/user', require('./routes/userRoutes'));
-app.use('/api/newsletter', require('./routes/newsletterRoutes'));
-app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/auth', authRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/provider', providerRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check route
 app.get('/', (req, res) => {
@@ -85,8 +94,11 @@ app.get('/api/health', (req, res) => {
     success: true,
     service: 'LocalFixr API',
     database: {
-      connected: require('mongoose').connection.readyState === 1,
-      state: require('mongoose').connection.readyState,
+      connected: mongoose.connection.readyState === 1,
+      state: mongoose.connection.readyState,
+    },
+    email: {
+      configured: Boolean(createTransport()),
     },
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
@@ -96,4 +108,4 @@ app.get('/api/health', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-module.exports = app;
+export default app;

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const pendingRegistrationSchema = new mongoose.Schema(
   {
@@ -77,4 +77,4 @@ const pendingRegistrationSchema = new mongoose.Schema(
 
 pendingRegistrationSchema.index({ email: 1, phone: 1 }, { unique: true });
 
-module.exports = mongoose.model('PendingRegistration', pendingRegistrationSchema);
+export default mongoose.model('PendingRegistration', pendingRegistrationSchema);

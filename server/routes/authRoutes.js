@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const {
+import {
   completeRegistration,
   loginUser,
   registerUser,
@@ -13,9 +13,9 @@ const {
   changePassword,
   verifyEmailOtp,
   verifyResetOtp,
-} = require('../controllers/authController');
-const { protect } = require('../middleware/roleMiddleware');
-const { authRateLimit, otpRateLimit } = require('../middleware/rateLimitMiddleware');
+} from '../controllers/authController.js';
+import { protect } from '../middleware/roleMiddleware.js';
+import { authRateLimit, otpRateLimit } from '../middleware/rateLimitMiddleware.js';
 
 router.post('/register/start', otpRateLimit, startRegistration);
 router.post('/register/resend', otpRateLimit, resendRegistrationOtp);
@@ -30,6 +30,6 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);
 router.put('/password', protect, changePassword);
 
-module.exports = router;
+export default router;
 
 

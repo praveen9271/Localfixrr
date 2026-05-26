@@ -1,9 +1,9 @@
-const Service = require('../models/Service');
-const Booking = require('../models/Booking');
-const Review = require('../models/Review');
-const Provider = require('../models/Provider');
-const { buildPagination, getPagination } = require('../utils/pagination');
-const { normalizeServiceCategory } = require('../config/serviceCategories');
+import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
+import Provider from '../models/Provider.js';
+import { buildPagination, getPagination } from '../utils/pagination.js';
+import { normalizeServiceCategory } from '../config/serviceCategories.js';
 
 const ensureProviderProfile = async (user) => {
   try {
@@ -348,8 +348,6 @@ const updateProviderProfile = async (req, res) => {
 // @access  Provider
 const getProviderReviews = async (req, res) => {
   try {
-    const Review = require('../models/Review');
-    const Provider = require('../models/Provider');
     const provider = await Provider.findOne({ user: req.user.id });
     if (!provider) {
       return res.status(404).json({ success: false, message: 'Provider profile not found' });
@@ -365,7 +363,7 @@ const getProviderReviews = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   createService,
   getMyServices,
   updateService,

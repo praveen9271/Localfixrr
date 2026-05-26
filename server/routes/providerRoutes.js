@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const {
+import {
   createService,
   getMyServices,
   updateService,
@@ -11,8 +11,8 @@ const {
   getProviderProfile,
   updateProviderProfile,
   getProviderReviews,
-} = require('../controllers/providerController');
-const { protect, providerOnly } = require('../middleware/roleMiddleware');
+} from '../controllers/providerController.js';
+import { protect, providerOnly } from '../middleware/roleMiddleware.js';
 
 // All routes are protected and provider-only
 router.use(protect);
@@ -36,4 +36,4 @@ router.get('/stats', getProviderStats);
 // Reviews route
 router.get('/reviews', getProviderReviews);
 
-module.exports = router;
+export default router;

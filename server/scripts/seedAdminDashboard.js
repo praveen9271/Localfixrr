@@ -1,15 +1,17 @@
-require('dotenv').config({ quiet: true });
+import dotenv from 'dotenv';
 
-const connectDB = require('../config/db');
-const User = require('../models/User');
-const Provider = require('../models/Provider');
-const Service = require('../models/Service');
-const Booking = require('../models/Booking');
-const Review = require('../models/Review');
-const Category = require('../models/Category');
-const Notification = require('../models/Notification');
-const Report = require('../models/Report');
-const AdminLog = require('../models/AdminLog');
+dotenv.config({ quiet: true });
+
+import connectDB from '../config/db.js';
+import User from '../models/User.js';
+import Provider from '../models/Provider.js';
+import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
+import Category from '../models/Category.js';
+import Notification from '../models/Notification.js';
+import Report from '../models/Report.js';
+import AdminLog from '../models/AdminLog.js';
 
 const categories = [
   { name: 'Plumbing', icon: 'Droplet', description: 'Pipe repairs, leak fixes, and installation work.' },
