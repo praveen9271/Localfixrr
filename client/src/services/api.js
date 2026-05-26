@@ -74,8 +74,8 @@ api.interceptors.response.use(
         return Promise.reject(error)
       }
       AUTH_STORAGE_KEYS.forEach(removeStorage)
-      if (window.location.pathname !== '/login') {
-        window.location.assign('/login')
+      if (window.location.pathname !== '/' || window.location.search !== '?login=1') {
+        window.location.assign('/?login=1')
       }
     }
     return Promise.reject(error)

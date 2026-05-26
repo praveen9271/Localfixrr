@@ -46,7 +46,7 @@ function ResetPassword() {
       sessionStorage.removeItem('resetToken')
       setSuccess(true)
       showToast(response.message)
-      setTimeout(() => navigate('/login', { replace: true }), 1500)
+      setTimeout(() => navigate('/?login=1', { replace: true }), 1500)
     } catch (error) {
       showToast(error.response?.data?.message || 'Unable to reset password', 'error')
     } finally {

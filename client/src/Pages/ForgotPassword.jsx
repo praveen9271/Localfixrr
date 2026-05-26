@@ -44,7 +44,7 @@ function ForgotPassword() {
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_30px_80px_rgba(15,23,42,0.14)]"
       >
-        <Link to="/login" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600">
+        <Link to="/?login=1" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600">
           <ArrowLeft className="h-4 w-4" />
           Back to login
         </Link>

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import Footer from './component/Footer'
 import Navbar from './component/Navbar'
 import RoleProtectedRoute from './component/RoleProtectedRoute'
@@ -21,7 +21,6 @@ import { validateRegisterForm } from './utils/validation'
 import { button3d, button3dSubtle, darkAppShell, lightAppShell } from './utils/tailwindStyles'
 
 const Home = lazy(() => import('./Pages/Home'))
-const Login = lazy(() => import('./Pages/Login'))
 const ForgotPassword = lazy(() => import('./Pages/ForgotPassword'))
 const VerifyOTP = lazy(() => import('./Pages/VerifyOTP'))
 const ResetPassword = lazy(() => import('./Pages/ResetPassword'))
@@ -612,6 +611,7 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
 
 function App() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [toast, setToast] = useState('')
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -639,9 +639,20 @@ function App() {
   const handleSwitchToRegister = () => {
     setIsLoginOpen(false)
     setIsRegisterOpen(true)
+    if (location.pathname === '/' && new URLSearchParams(location.search).get('login') === '1') {
+      navigate('/', { replace: true })
+    }
   }
 
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
+  const isLoginRequested = location.pathname === '/' && new URLSearchParams(location.search).get('login') === '1'
+
+  const handleLoginClose = () => {
+    setIsLoginOpen(false)
+    if (isLoginRequested) {
+      navigate('/', { replace: true })
+    }
+  }
 
   return (
     <div className={darkMode ? darkAppShell : lightAppShell}>
@@ -661,7 +672,7 @@ function App() {
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/provider/:id" element={<ProviderDetails />} />
         <Route path="/support/:slug" element={<SupportPage />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Navigate to="/?login=1" replace />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -740,8 +751,8 @@ function App() {
       {!isDashboardRoute && <Footer onToast={showToast} />}
       {!isDashboardRoute && <Chatbot />}
       <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
+        isOpen={isLoginOpen || isLoginRequested}
+        onClose={handleLoginClose}
         onToast={showToast}
         onSwitchToRegister={handleSwitchToRegister}
       />

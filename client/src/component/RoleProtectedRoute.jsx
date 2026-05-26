@@ -5,7 +5,7 @@ const RoleProtectedRoute = ({ children, allowedRoles }) => {
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [];
 
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/?login=1" replace />;
   }
 
   const userRole = getUserRole();
