@@ -13,7 +13,7 @@ import providerRoutes from './routes/providerRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
-import { createTransport } from './services/otpService.js';
+import { getEmailStatus } from './services/otpService.js';
 
 // Load env vars
 dotenv.config({ quiet: true });
@@ -37,21 +37,10 @@ const allowedOrigins = String(process.env.CLIENT_URL || process.env.CLIENT_ORIGI
   .split(',')
   .map(normalizeOrigin)
   .filter(Boolean);
-const allowVercelOrigins = process.env.ALLOW_VERCEL_ORIGINS !== 'false';
 
 const isAllowedOrigin = (origin) => {
   const normalizedOrigin = normalizeOrigin(origin);
-  if (allowedOrigins.includes(normalizedOrigin)) return true;
-
-  if (allowVercelOrigins) {
-    try {
-      return new URL(normalizedOrigin).hostname.endsWith('.vercel.app');
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+  return allowedOrigins.includes(normalizedOrigin);
 };
 
 app.use(cors({
@@ -97,9 +86,7 @@ app.get('/api/health', (req, res) => {
       connected: mongoose.connection.readyState === 1,
       state: mongoose.connection.readyState,
     },
-    email: {
-      configured: Boolean(createTransport()),
-    },
+    email: getEmailStatus(),
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });

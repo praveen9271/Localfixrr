@@ -22,6 +22,16 @@ const getSmtpPort = () => {
   return envFlag(process.env.SMTP_SECURE) ? 465 : 587;
 };
 
+const getSmtpConfig = () => {
+  const host = getEnv('SMTP_HOST');
+  const user = getEnv('SMTP_USER');
+  const pass = getEnv('SMTP_PASS');
+  const port = getSmtpPort();
+  const secure = port === 465 || envFlag(process.env.SMTP_SECURE);
+
+  return { host, user, pass, port, secure };
+};
+
 const escapeHtml = (value) =>
   String(value || '')
     .replace(/&/g, '&amp;')
@@ -61,9 +71,7 @@ const canResend = (pending) => {
 };
 
 const createTransport = () => {
-  const host = getEnv('SMTP_HOST');
-  const user = getEnv('SMTP_USER');
-  const pass = getEnv('SMTP_PASS');
+  const { host, user, pass, port, secure } = getSmtpConfig();
 
   if (!host || !user || !pass) {
     return null;
@@ -71,16 +79,31 @@ const createTransport = () => {
 
   return nodemailer.createTransport({
     host,
-    port: getSmtpPort(),
-    secure: envFlag(process.env.SMTP_SECURE),
+    port,
+    secure,
     auth: {
       user,
       pass,
+    },
+    tls: {
+      servername: host,
     },
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
     socketTimeout: SMTP_TIMEOUT_MS,
   });
+};
+
+const getEmailStatus = () => {
+  const { host, user, pass, port, secure } = getSmtpConfig();
+
+  return {
+    configured: Boolean(host && user && pass),
+    host: host || null,
+    port,
+    secure,
+    user: user ? user.replace(/(.{2}).+(@.*)/, '$1***$2') : null,
+  };
 };
 
 const sendEmailOtp = async ({ email, name, otp }) => {
@@ -228,6 +251,7 @@ export {
   createTransport,
   generateOtp,
   getOtpExpiry,
+  getEmailStatus,
   hashOtp,
   isOtpMatch,
   sendEmailOtp,

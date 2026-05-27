@@ -6,6 +6,8 @@ import Button from '../components/ui/Button'
 import Toast from '../components/ui/Toast'
 import { forgotPassword } from '../services/authService'
 
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
 function ForgotPassword() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -21,16 +23,22 @@ function ForgotPassword() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const cleanEmail = email.trim().toLowerCase()
+
+    if (!isValidEmail(cleanEmail)) {
+      showToast('Enter a valid email address.', 'error')
+      return
+    }
+
     setLoading(true)
     try {
-      const cleanEmail = email.trim().toLowerCase()
       const response = await forgotPassword({ email: cleanEmail })
       sessionStorage.setItem('resetEmail', cleanEmail)
       sessionStorage.setItem('resetExpiresAt', response.expiresAt || '')
       showToast(response.message)
       navigate('/verify-otp', { state: { email: cleanEmail, expiresAt: response.expiresAt } })
     } catch (error) {
-      showToast(error.response?.data?.message || 'Unable to send reset OTP', 'error')
+      showToast(error.response?.data?.message || error.userMessage || 'Unable to send reset OTP', 'error')
     } finally {
       setLoading(false)
     }
@@ -62,6 +70,7 @@ function ForgotPassword() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
+            disabled={loading}
             className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50"
             placeholder="you@example.com"
           />

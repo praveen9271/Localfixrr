@@ -20,20 +20,13 @@ const removeStorage = (key) => {
 
 const normalizeApiUrl = (url) => {
   const cleanUrl = String(url || '').trim().replace(/\/+$/, '')
-  if (!cleanUrl) return '/api'
+  if (!cleanUrl) return 'http://localhost:5000/api'
   return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`
 }
 
 const getApiBaseUrl = () => {
-  const {
-    VITE_API_URL,
-    VITE_LOCAL_API_URL,
-    VITE_PRODUCTION_API_URL,
-    PROD,
-  } = import.meta.env
-
-  const modeApiUrl = PROD ? VITE_PRODUCTION_API_URL : VITE_LOCAL_API_URL
-  return normalizeApiUrl(VITE_API_URL || modeApiUrl)
+  const { VITE_API_URL, VITE_LOCAL_API_URL } = import.meta.env
+  return normalizeApiUrl(VITE_API_URL || VITE_LOCAL_API_URL)
 }
 
 const api = axios.create({
@@ -65,7 +58,7 @@ api.interceptors.response.use(
     if (error.code === 'ECONNABORTED') {
       error.userMessage = 'The server took too long to respond. Please try again.'
     } else if (!error.response) {
-      error.userMessage = 'Unable to reach the server. Check your connection or API deployment.'
+      error.userMessage = 'Unable to reach the local server. Make sure it is running on http://localhost:5000.'
     }
 
     if (error.response?.status === 401) {

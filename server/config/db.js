@@ -41,7 +41,7 @@ const connectDB = async () => {
     console.log(`MongoDB connected: ${connection.connection.host}`);
   } catch (error) {
     if (error.name === 'MongooseServerSelectionError') {
-      error.message = `${error.message}\n\nCheck MongoDB Atlas Network Access. Add your Render service outbound IP ranges to the Atlas IP Access List, or temporarily allow 0.0.0.0/0 only while testing. If DNS lookup fails, set DNS_SERVERS=8.8.8.8,1.1.1.1 in Render.`;
+      error.message = `${error.message}\n\nCheck MongoDB Atlas Network Access for your local machine. If DNS lookup fails, set DNS_SERVERS=8.8.8.8,1.1.1.1 in server/.env while testing.`;
     }
     throw error;
   }
