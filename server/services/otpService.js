@@ -1,36 +1,17 @@
 import crypto from 'node:crypto';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = Number(process.env.OTP_TTL_MINUTES || 10);
 const OTP_RESEND_SECONDS = Number(process.env.OTP_RESEND_SECONDS || 60);
 const OTP_MAX_RESENDS = Number(process.env.OTP_MAX_RESENDS || 5);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
-const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
 
 const getEnv = (key) => String(process.env[key] || '').trim();
 
 const generateOtp = () => String(crypto.randomInt(0, 1000000)).padStart(OTP_LENGTH, '0');
 
 const isProduction = () => process.env.NODE_ENV === 'production';
-
-const envFlag = (value) => String(value || '').trim().toLowerCase() === 'true';
-
-const getSmtpPort = () => {
-  const port = Number(getEnv('SMTP_PORT'));
-  if (Number.isInteger(port) && port > 0) return port;
-  return envFlag(process.env.SMTP_SECURE) ? 465 : 587;
-};
-
-const getSmtpConfig = () => {
-  const host = getEnv('SMTP_HOST');
-  const user = getEnv('SMTP_USER');
-  const pass = getEnv('SMTP_PASS');
-  const port = getSmtpPort();
-  const secure = port === 465 || envFlag(process.env.SMTP_SECURE);
-
-  return { host, user, pass, port, secure };
-};
 
 const escapeHtml = (value) =>
   String(value || '')
@@ -70,57 +51,68 @@ const canResend = (pending) => {
   return elapsedSeconds >= OTP_RESEND_SECONDS;
 };
 
-const createTransport = () => {
-  const { host, user, pass, port, secure } = getSmtpConfig();
+const getEmailFrom = () => getEnv('EMAIL_FROM') || getEnv('RESEND_FROM');
 
-  if (!host || !user || !pass) {
-    return null;
-  }
+const createResendClient = () => {
+  const apiKey = getEnv('RESEND_API_KEY');
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      servername: host,
-    },
-    connectionTimeout: SMTP_TIMEOUT_MS,
-    greetingTimeout: SMTP_TIMEOUT_MS,
-    socketTimeout: SMTP_TIMEOUT_MS,
-  });
+  return apiKey ? new Resend(apiKey) : null;
 };
 
 const getEmailStatus = () => {
-  const { host, user, pass, port, secure } = getSmtpConfig();
+  const apiKey = getEnv('RESEND_API_KEY');
+  const from = getEmailFrom();
 
   return {
-    configured: Boolean(host && user && pass),
-    host: host || null,
-    port,
-    secure,
-    user: user ? user.replace(/(.{2}).+(@.*)/, '$1***$2') : null,
+    provider: 'resend',
+    configured: Boolean(apiKey && from),
+    from: from || null,
+    apiKey: apiKey ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : null,
   };
 };
 
-const sendEmailOtp = async ({ email, name, otp }) => {
-  const transport = createTransport();
-  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
+const getResendErrorMessage = (error) => {
+  if (!error) return 'Unknown Resend error';
+  if (typeof error === 'string') return error;
+  return error.message || error.name || JSON.stringify(error);
+};
 
-  if (!transport || !from) {
+const sendEmail = async ({ to, subject, text, html }) => {
+  const resend = createResendClient();
+  const from = getEmailFrom();
+
+  if (!resend || !from) {
+    return { configured: false };
+  }
+
+  const result = await resend.emails.send({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  });
+
+  if (result?.error) {
+    throw new Error(getResendErrorMessage(result.error));
+  }
+
+  return { configured: true, data: result?.data || result };
+};
+
+const sendEmailOtp = async ({ email, name, otp }) => {
+  const emailStatus = getEmailStatus();
+
+  if (!emailStatus.configured) {
     if (isProduction()) {
       throw new Error('Email OTP is not configured');
     }
-    logDevEmailOtp(email, otp, 'SMTP is not configured. Using console OTP fallback.');
+    logDevEmailOtp(email, otp, 'Resend is not configured. Using console OTP fallback.');
     return { sent: false, devOnly: true };
   }
 
   try {
-    await transport.sendMail({
-      from,
+    await sendEmail({
       to: email,
       subject: 'Verify your LocalFixr email',
       text: `Your LocalFixr email verification OTP is ${otp}. This code expires in ${OTP_TTL_MINUTES} minutes.`,
@@ -138,7 +130,7 @@ const sendEmailOtp = async ({ email, name, otp }) => {
     if (isProduction()) {
       throw new Error(`Email OTP could not be sent: ${error.message}`);
     }
-    logDevEmailOtp(email, otp, `Nodemailer failed: ${error.message}. Using console OTP fallback.`);
+    logDevEmailOtp(email, otp, `Resend failed: ${error.message}. Using console OTP fallback.`);
     return { sent: false, devOnly: true, error: error.message };
   }
 
@@ -146,20 +138,18 @@ const sendEmailOtp = async ({ email, name, otp }) => {
 };
 
 const sendResetPasswordOtp = async ({ email, name, otp }) => {
-  const transport = createTransport();
-  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
+  const emailStatus = getEmailStatus();
 
-  if (!transport || !from) {
+  if (!emailStatus.configured) {
     if (isProduction()) {
       throw new Error('Password reset email is not configured');
     }
-    logDevEmailOtp(email, otp, 'SMTP is not configured. Using console password reset OTP fallback.');
+    logDevEmailOtp(email, otp, 'Resend is not configured. Using console password reset OTP fallback.');
     return { sent: false, devOnly: true };
   }
 
   try {
-    await transport.sendMail({
-      from,
+    await sendEmail({
       to: email,
       subject: 'Reset Your Password - LocalFixr',
       text: `Your LocalFixr password reset OTP is ${otp}. This code expires in ${OTP_TTL_MINUTES} minutes. If you did not request this, please ignore this email.`,
@@ -187,7 +177,7 @@ const sendResetPasswordOtp = async ({ email, name, otp }) => {
     if (isProduction()) {
       throw new Error(`Password reset email could not be sent: ${error.message}`);
     }
-    logDevEmailOtp(email, otp, `Nodemailer failed: ${error.message}. Using console password reset OTP fallback.`);
+    logDevEmailOtp(email, otp, `Resend failed: ${error.message}. Using console password reset OTP fallback.`);
     return { sent: false, devOnly: true, error: error.message };
   }
 
@@ -195,10 +185,9 @@ const sendResetPasswordOtp = async ({ email, name, otp }) => {
 };
 
 const sendNewsletterSubscriptionEmail = async ({ email }) => {
-  const transport = createTransport();
-  const from = getEnv('EMAIL_FROM') || getEnv('SMTP_USER');
+  const emailStatus = getEmailStatus();
 
-  if (!transport || !from) {
+  if (!emailStatus.configured) {
     if (isProduction()) {
       throw new Error('Newsletter email is not configured');
     }
@@ -207,8 +196,7 @@ const sendNewsletterSubscriptionEmail = async ({ email }) => {
   }
 
   try {
-    await transport.sendMail({
-      from,
+    await sendEmail({
       to: email,
       subject: 'Welcome to LocalFixr updates',
       text: 'Thanks for subscribing to LocalFixr. You will receive helpful home-service updates, offers, and platform news from us.',
@@ -235,7 +223,7 @@ const sendNewsletterSubscriptionEmail = async ({ email }) => {
     if (isProduction()) {
       throw new Error(`Newsletter email could not be sent: ${error.message}`);
     }
-    console.warn(`[DEV NEWSLETTER EMAIL] Nodemailer failed for ${email}: ${error.message}`);
+    console.warn(`[DEV NEWSLETTER EMAIL] Resend failed for ${email}: ${error.message}`);
     return { sent: false, devOnly: true, error: error.message };
   }
 
@@ -248,7 +236,7 @@ export {
   OTP_RESEND_SECONDS,
   OTP_TTL_MINUTES,
   canResend,
-  createTransport,
+  createResendClient,
   generateOtp,
   getOtpExpiry,
   getEmailStatus,

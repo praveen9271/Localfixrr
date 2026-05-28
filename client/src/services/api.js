@@ -58,7 +58,7 @@ api.interceptors.response.use(
     if (error.code === 'ECONNABORTED') {
       error.userMessage = 'The server took too long to respond. Please try again.'
     } else if (!error.response) {
-      error.userMessage = 'Unable to reach the local server. Make sure it is running on http://localhost:5000.'
+      error.userMessage = 'Unable to reach the server. Please check your connection and try again.'
     }
 
     if (error.response?.status === 401) {

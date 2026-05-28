@@ -33,7 +33,8 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/+$/, '');
-const allowedOrigins = String(process.env.CLIENT_URL || process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+const defaultClientOrigins = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173,http://localhost:3000';
+const allowedOrigins = String(process.env.CLIENT_URL || process.env.CLIENT_ORIGINS || defaultClientOrigins)
   .split(',')
   .map(normalizeOrigin)
   .filter(Boolean);

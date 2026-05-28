@@ -19,7 +19,7 @@ const fallbackReply = (message) => {
   const text = message.toLowerCase();
 
   if (text.includes('provider') || text.includes('register')) {
-    return 'You can register as a service provider from the Register button, choose “Service Provider”, select your approved work type, verify your email OTP, and then admin can review your profile.';
+    return 'You can register as a service provider from the Register button, choose "Service Provider", select your approved work type, verify your email OTP, and then admin can review your profile.';
   }
   if (text.includes('book') || text.includes('booking')) {
     return 'To book a service, open Services, choose your category, view available providers, and use the service/provider details to continue. After login, you can track bookings from your dashboard.';

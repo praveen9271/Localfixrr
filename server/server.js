@@ -10,11 +10,23 @@ const validateProductionEnv = () => {
   if (process.env.NODE_ENV !== 'production') return;
 
   const missing = [];
+  const weak = [];
   if (!process.env.MONGODB_URI && !process.env.MONGO_URI) missing.push('MONGODB_URI');
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'localfixr-dev-secret') missing.push('JWT_SECRET');
+  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
+  if (process.env.JWT_SECRET === 'localfixr-dev-secret') weak.push('JWT_SECRET');
+  if (!process.env.OTP_SECRET) missing.push('OTP_SECRET');
+  if (process.env.OTP_SECRET === 'replace-with-a-different-long-random-secret') weak.push('OTP_SECRET');
+  if (!process.env.RESEND_API_KEY) missing.push('RESEND_API_KEY');
+  if (!process.env.EMAIL_FROM && !process.env.RESEND_FROM) missing.push('EMAIL_FROM');
+  if (!process.env.CLIENT_URL && !process.env.CLIENT_ORIGINS) missing.push('CLIENT_URL');
+  if (!process.env.ADMIN_EMAIL) missing.push('ADMIN_EMAIL');
 
   if (missing.length) {
     throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+
+  if (weak.length) {
+    throw new Error(`Replace weak development secrets before production: ${weak.join(', ')}`);
   }
 };
 
