@@ -33,11 +33,16 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/+$/, '');
-const defaultClientOrigins = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173,http://localhost:3000';
-const allowedOrigins = String(process.env.CLIENT_URL || process.env.CLIENT_ORIGINS || defaultClientOrigins)
-  .split(',')
+const parseOrigins = (...values) => values
+  .flatMap((value) => String(value || '').split(','))
   .map(normalizeOrigin)
   .filter(Boolean);
+
+const defaultClientOrigins = process.env.NODE_ENV === 'production'
+  ? ''
+  : 'http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000';
+const configuredOrigins = parseOrigins(process.env.CLIENT_URL, process.env.CLIENT_ORIGINS);
+const allowedOrigins = configuredOrigins.length ? configuredOrigins : parseOrigins(defaultClientOrigins);
 
 const isAllowedOrigin = (origin) => {
   const normalizedOrigin = normalizeOrigin(origin);
@@ -51,6 +56,9 @@ app.use(cors({
     error.statusCode = 403;
     return callback(error);
   },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+  exposedHeaders: ['X-Request-Id'],
   credentials: true,
   optionsSuccessStatus: 204,
 }));
