@@ -774,7 +774,7 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
                 onChange={registerFormik.handleChange}
                 onBlur={registerFormik.handleBlur}
                 className={`mt-2 w-full rounded-2xl border px-4 py-3 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 ${inputStateClass(registerFormik.touched.businessName && registerFormik.errors.businessName)}`}
-                placeholder="e.g., Ravi Plumbing Services"
+                placeholder="Enter your business name"
               />
               <FieldError>{registerFormik.touched.businessName && registerFormik.errors.businessName}</FieldError>
             </label>

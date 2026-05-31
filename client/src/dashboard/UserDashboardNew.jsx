@@ -613,12 +613,12 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                   </svg>
                   Location
                 </h3>
-                <p className="mt-1 text-sm text-slate-600">{selectedService.location || 'All Areas'}</p>
+                <p className="mt-1 text-sm text-slate-600">{selectedService.location || 'Location not provided'}</p>
               </div>
               <div>
                 <h3 className="font-bold text-slate-900">Provider</h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {selectedService.provider?.businessName || selectedService.provider?.user?.name || 'Unknown Provider'}
+                  {selectedService.provider?.businessName || selectedService.provider?.user?.name || 'Provider not available'}
                 </p>
               </div>
             </div>

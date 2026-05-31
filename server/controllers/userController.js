@@ -3,7 +3,6 @@ import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import Provider from '../models/Provider.js';
 import mongoose from 'mongoose';
-import fallbackServices from '../data/fallbackServices.js';
 import { buildPagination, getPagination } from '../utils/pagination.js';
 
 const populateServiceProvider = {
@@ -32,52 +31,6 @@ const getCategoryValues = (category) => {
 };
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
-
-const filterFallbackServices = ({ category, search, minPrice, maxPrice }) => {
-  const categoryValues = getCategoryValues(category).map((value) => value.toLowerCase());
-  const searchValue = String(search || '').trim().toLowerCase();
-  const min = minPrice !== undefined && minPrice !== '' ? Number(minPrice) : undefined;
-  const max = maxPrice !== undefined && maxPrice !== '' ? Number(maxPrice) : undefined;
-
-  return fallbackServices.filter((service) => {
-    if (categoryValues.length && !categoryValues.includes(String(service.category).toLowerCase())) {
-      return false;
-    }
-
-    if (searchValue) {
-      const searchable = [
-        service.title,
-        service.description,
-        service.category,
-        service.provider?.businessName,
-        service.provider?.user?.name,
-        service.location,
-      ].join(' ').toLowerCase();
-      if (!searchable.includes(searchValue)) return false;
-    }
-
-    if (min !== undefined && service.price < min) return false;
-    if (max !== undefined && service.price > max) return false;
-
-    return true;
-  });
-};
-
-const sendFallbackServices = (req, res, message = 'Showing demo services because MongoDB is not connected.') => {
-  const { category, search, minPrice, maxPrice } = req.query;
-  const { page, limit, skip } = getPagination(req.query);
-  const filtered = filterFallbackServices({ category, search, minPrice, maxPrice });
-  const services = filtered.slice(skip, skip + limit);
-
-  res.status(200).json({
-    success: true,
-    demo: true,
-    count: services.length,
-    pagination: buildPagination(page, limit, filtered.length),
-    services,
-    message,
-  });
-};
 
 const recalculateRatings = async (serviceId, providerId) => {
   const [serviceRating] = await Review.aggregate([
@@ -114,7 +67,7 @@ const getAllServices = async (req, res) => {
     };
 
     if (!isDbConnected()) {
-      return sendFallbackServices(req, res);
+      return res.status(503).json({ success: false, message: 'Service database is temporarily unavailable' });
     }
 
     if (category) {
@@ -142,7 +95,12 @@ const getAllServices = async (req, res) => {
 
     const total = await Service.countDocuments(query);
     if (total === 0) {
-      return sendFallbackServices(req, res, 'Showing demo services because MongoDB has no matching active services.');
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        pagination: buildPagination(page, limit, 0),
+        services: [],
+      });
     }
 
     const services = await Service.find(query)
@@ -168,11 +126,6 @@ const getAllServices = async (req, res) => {
 // @access  User
 const getServiceById = async (req, res) => {
   try {
-    const fallbackService = fallbackServices.find((item) => item._id === req.params.id);
-    if (fallbackService) {
-      return res.status(200).json({ success: true, demo: true, service: fallbackService });
-    }
-
     if (!isDbConnected()) {
       return res.status(404).json({ success: false, message: 'Service not found' });
     }
@@ -382,11 +335,6 @@ const createReview = async (req, res) => {
 // @access  Public
 const getServiceReviews = async (req, res) => {
   try {
-    const fallbackService = fallbackServices.find((item) => item._id === req.params.id);
-    if (fallbackService) {
-      return res.status(200).json({ success: true, demo: true, count: 0, reviews: [] });
-    }
-
     if (!isDbConnected()) {
       return res.status(404).json({ success: false, message: 'Service not found' });
     }

@@ -6,6 +6,7 @@ import {
   getUserById,
   updateUser,
   deleteUser,
+  deleteProvider,
   getAllServices,
   deleteService,
   getAllBookings,
@@ -42,6 +43,7 @@ router.delete('/users/:id', deleteUser);
 // Provider management routes
 router.get('/providers', getAllProviders);
 router.put('/providers/:id/status', updateProviderStatus);
+router.delete('/providers/:id', deleteProvider);
 
 // Service management routes
 router.get('/services', getAllServices);

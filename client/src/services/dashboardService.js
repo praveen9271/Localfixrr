@@ -61,6 +61,10 @@ export const deleteUser = async (id) => {
   return del(`/admin/users/${id}`);
 };
 
+export const deleteProvider = async (id) => {
+  return del(`/admin/providers/${id}`);
+};
+
 export const updateProviderStatus = async (id, status) => {
   return put(`/admin/providers/${id}/status`, { status });
 };

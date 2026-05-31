@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPublicServices } from '../services/dashboardService'
+import { getPublicServices, getServiceReviews } from '../services/dashboardService'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import EmptyState from '../components/ui/EmptyState'
 
@@ -21,18 +21,21 @@ function Reviews() {
     setError('')
     try {
       const data = await getPublicServices()
-      const serviceReviews = (data.services || [])
-        .filter((service) => Number(service.rating || 0) > 0 || Number(service.reviewsCount || 0) > 0)
-        .map((service) => ({
-          _id: service._id,
-          rating: Math.round(Number(service.rating || 0)),
-          comment: `${service.provider?.businessName || service.provider?.user?.name || 'A local provider'} is rated highly for ${service.title}.`,
-          createdAt: service.updatedAt || service.createdAt,
-          user: { name: 'LocalFixr customer' },
-          service,
-          provider: service.provider,
-        }))
-      setReviews(serviceReviews)
+      const reviewGroups = await Promise.all(
+        (data.services || []).map(async (service) => {
+          try {
+            const response = await getServiceReviews(service._id)
+            return (response.reviews || []).map((review) => ({
+              ...review,
+              service,
+              provider: service.provider,
+            }))
+          } catch {
+            return []
+          }
+        }),
+      )
+      setReviews(reviewGroups.flat())
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load reviews')
     } finally {
@@ -86,7 +89,7 @@ function Reviews() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-indigo-100 text-indigo-600 font-bold">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-indigo-100 font-bold text-indigo-600">
                   {(review.user?.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -96,11 +99,8 @@ function Reviews() {
                   <p className="text-xs text-slate-500">{formatDate(review.createdAt)}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
-                <span className="ml-1 text-sm font-semibold text-amber-600">
-                  {review.rating}/5
-                </span>
+              <div className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
+                Rating {Number(review.rating || 0)}/5
               </div>
             </div>
 
@@ -108,17 +108,27 @@ function Reviews() {
               {review.comment}
             </p>
 
-            <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
-              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-                {review.service?.title || 'Service'}
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {review.service?.category || 'General'}
-              </span>
-              <span className="text-xs text-slate-400">
-                by {review.provider?.businessName || 'Provider'}
-              </span>
-            </div>
+            {(review.service?.title ||
+              review.service?.category ||
+              review.provider?.businessName) && (
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                {review.service?.title && (
+                  <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    {review.service.title}
+                  </span>
+                )}
+                {review.service?.category && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    {review.service.category}
+                  </span>
+                )}
+                {review.provider?.businessName && (
+                  <span className="text-xs text-slate-400">
+                    by {review.provider.businessName}
+                  </span>
+                )}
+              </div>
+            )}
           </article>
         ))}
       </div>

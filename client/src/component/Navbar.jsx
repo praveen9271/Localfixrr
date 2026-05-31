@@ -170,17 +170,32 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsMenuOpen((current) => !current)}
-          className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition duration-200 lg:hidden ${
-            darkMode
-              ? "border-white/15 bg-white/8 text-white hover:bg-white/12"
-              : "border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-indigo-50 hover:text-indigo-700"
-          }`}
-        >
-          <Icon name={isMenuOpen ? "close" : "menu"} className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          {!authenticated && (
+            <button
+              type="button"
+              onClick={onLoginClick}
+              className={`inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border px-3 text-sm font-bold transition duration-200 ${
+                darkMode
+                  ? "border-white/15 bg-white/8 text-indigo-100 hover:bg-white/12 hover:text-white"
+                  : "border-indigo-200 bg-white text-indigo-700 shadow-sm hover:bg-indigo-50"
+              }`}
+            >
+              Login
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((current) => !current)}
+            className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition duration-200 ${
+              darkMode
+                ? "border-white/15 bg-white/8 text-white hover:bg-white/12"
+                : "border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-indigo-50 hover:text-indigo-700"
+            }`}
+          >
+            <Icon name={isMenuOpen ? "close" : "menu"} className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {isMenuOpen && (
@@ -223,10 +238,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       handleDashboard();
                     }}
-                    className={`h-11 cursor-pointer px-1 text-left text-sm font-bold transition duration-200 ${
+                    className={`inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border px-4 text-sm font-bold transition duration-200 ${
                       darkMode
-                        ? "text-indigo-200 hover:text-white"
-                        : "text-indigo-700 hover:text-indigo-900"
+                        ? "border-white/15 bg-white/8 text-indigo-100 hover:bg-white/12 hover:text-white"
+                        : "border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50"
                     }`}
                   >
                     Dashboard
@@ -237,7 +252,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       handleLogout();
                     }}
-                    className="h-11 cursor-pointer px-1 text-left text-sm font-bold text-red-600 transition duration-200 hover:text-red-700"
+                    className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-bold text-red-600 transition duration-200 hover:bg-red-50 hover:text-red-700"
                   >
                     Logout
                   </button>
@@ -250,10 +265,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       onLoginClick();
                     }}
-                    className={`h-11 cursor-pointer px-1 text-left text-sm font-bold transition duration-200 ${
+                    className={`inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border px-4 text-sm font-bold transition duration-200 ${
                       darkMode
-                        ? "text-indigo-200 hover:text-white"
-                        : "text-indigo-700 hover:text-indigo-900"
+                        ? "border-white/15 bg-white/8 text-indigo-100 hover:bg-white/12 hover:text-white"
+                        : "border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50"
                     }`}
                   >
                     Login

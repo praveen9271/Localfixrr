@@ -47,6 +47,7 @@ import {
   deleteAdminCategory,
   deleteReview,
   deleteService,
+  deleteProvider,
   deleteUser,
   exportAdminUsersCsv,
   generateAdminReport,
@@ -662,6 +663,9 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                       </IconButton>
                       <IconButton title="Suspend provider" disabled={saving} onClick={() => runAction(() => updateProviderStatus(provider._id, 'suspended'), 'Provider suspended')} className="text-amber-600 hover:bg-amber-50 hover:text-amber-700">
                         <XCircle className="h-4 w-4" />
+                      </IconButton>
+                      <IconButton title="Delete provider" disabled={saving} onClick={() => confirmAction('Delete provider', `Delete ${provider.businessName || provider.user?.name || 'this provider'} and all related data?`, () => deleteProvider(provider._id), 'Provider deleted')} className="text-rose-600 hover:bg-rose-50 hover:text-rose-700">
+                        <Trash2 className="h-4 w-4" />
                       </IconButton>
                     </div>
                   ),

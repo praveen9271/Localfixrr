@@ -5,6 +5,7 @@ import Provider from '../models/Provider.js';
 import Review from '../models/Review.js';
 import Category from '../models/Category.js';
 import Notification from '../models/Notification.js';
+import PendingRegistration from '../models/PendingRegistration.js';
 import Report from '../models/Report.js';
 import AdminLog from '../models/AdminLog.js';
 import { buildPagination, getPagination } from '../utils/pagination.js';
@@ -30,6 +31,57 @@ const logAdminAction = async (req, action, targetCollection, targetId = null, me
     targetId,
     metadata,
   });
+};
+
+const getPendingRegistrationQuery = (user) => ({
+  $or: [
+    user?.email ? { email: user.email } : null,
+    user?.phone ? { phone: user.phone } : null,
+  ].filter(Boolean),
+});
+
+const cleanupUserData = async (user, providerOverride = null) => {
+  const provider = providerOverride || (user?.role === 'service_provider' ? await Provider.findOne({ user: user._id }) : null);
+  const pendingRegistrationQuery = getPendingRegistrationQuery(user);
+  const cleanupTasks = [
+    Notification.deleteMany({ recipient: user._id }),
+    PendingRegistration.deleteMany(pendingRegistrationQuery.$or.length ? pendingRegistrationQuery : { _id: null }),
+  ];
+
+  if (provider) {
+    cleanupTasks.push(
+      Service.deleteMany({ provider: provider._id }),
+      Booking.deleteMany({
+        $or: [
+          { customer: user._id },
+          { provider: provider._id },
+        ],
+      }),
+      Review.deleteMany({
+        $or: [
+          { user: user._id },
+          { provider: provider._id },
+        ],
+      }),
+      Provider.deleteOne({ _id: provider._id }),
+    );
+  } else {
+    cleanupTasks.push(
+      Booking.deleteMany({ customer: user._id }),
+      Review.deleteMany({ user: user._id }),
+    );
+  }
+
+  await Promise.all(cleanupTasks);
+};
+
+const cleanupOrphanProviderData = async (provider) => {
+  await Promise.all([
+    Service.deleteMany({ provider: provider._id }),
+    Booking.deleteMany({ provider: provider._id }),
+    Review.deleteMany({ provider: provider._id }),
+    Provider.deleteOne({ _id: provider._id }),
+  ]);
 };
 
 const applySearch = (query, fields, search) => {
@@ -105,22 +157,31 @@ const deleteUser = asyncHandler(async (req, res) => {
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Admin users cannot be deleted here.' });
 
-  if (user.role === 'service_provider') {
-    const provider = await Provider.findOne({ user: user._id });
-    if (provider) {
-      await Service.deleteMany({ provider: provider._id });
-      await Booking.deleteMany({ provider: provider._id });
-      await Review.deleteMany({ provider: provider._id });
-      await provider.deleteOne();
-    }
-  } else {
-    await Booking.deleteMany({ customer: user._id });
-    await Review.deleteMany({ user: user._id });
-  }
-
+  await cleanupUserData(user);
   await logAdminAction(req, 'deleted user', 'users', user._id, { email: user.email });
   await user.deleteOne();
   res.status(200).json({ success: true, message: 'User and related data deleted successfully' });
+});
+
+const deleteProvider = asyncHandler(async (req, res) => {
+  const provider = await Provider.findById(req.params.id);
+  if (!provider) return res.status(404).json({ success: false, message: 'Provider not found' });
+
+  const user = provider.user ? await User.findById(provider.user) : null;
+  if (user?.role === 'admin') {
+    return res.status(400).json({ success: false, message: 'Admin users cannot be deleted here.' });
+  }
+
+  if (user) {
+    await cleanupUserData(user, provider);
+    await logAdminAction(req, 'deleted provider', 'providers', provider._id, { email: user.email, userId: user._id });
+    await user.deleteOne();
+  } else {
+    await cleanupOrphanProviderData(provider);
+    await logAdminAction(req, 'deleted orphan provider', 'providers', provider._id);
+  }
+
+  res.status(200).json({ success: true, message: 'Provider account and related data deleted successfully' });
 });
 
 const getAllProviders = asyncHandler(async (req, res) => {
@@ -501,6 +562,7 @@ export {
   getUserById,
   updateUser,
   deleteUser,
+  deleteProvider,
   getAllServices,
   deleteService,
   getAllBookings,

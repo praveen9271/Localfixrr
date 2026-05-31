@@ -73,13 +73,13 @@ const toTitleCase = (value) =>
 function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   const navigate = useNavigate()
   const [user] = useState(getCurrentUser())
-  const displayName = toTitleCase(profile?.businessName || user?.name)
   const activeTab = defaultTab
   const [stats, setStats] = useState({})
   const [services, setServices] = useState([])
   const [bookings, setBookings] = useState([])
   const [reviews, setReviews] = useState([])
   const [profile, setProfile] = useState(null)
+  const displayName = toTitleCase(profile?.businessName || user?.name)
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -474,7 +474,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                   <p className="mt-3 text-sm text-slate-600 line-clamp-2">{service.description}</p>
                   <div className="mt-3 flex items-center justify-between">
                     <span className="font-black text-indigo-700">{formatCurrency(service.price)}</span>
-                    <span className="text-xs text-slate-500">{service.location || 'No location'}</span>
+                    {service.location && <span className="text-xs text-slate-500">{service.location}</span>}
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Button variant="secondary" onClick={() => startEdit(service)} size="sm">Edit</Button>
@@ -494,7 +494,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
             <h2 className="text-xl font-black text-slate-900">Customer Reviews</h2>
             <div className="flex items-center gap-4">
               <span className="text-sm font-semibold text-slate-500">
-                Average: {profile?.rating?.toFixed(1) || '0.0'} ⭐
+                Average: {profile?.rating ? `${profile.rating.toFixed(1)} / 5` : 'No ratings yet'}
               </span>
               <span className="text-sm font-semibold text-slate-500">
                 {reviews.length} total
@@ -590,7 +590,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
               value={profileFormik.values.serviceAreas}
               onChange={profileFormik.handleChange}
               onBlur={profileFormik.handleBlur}
-              placeholder="e.g., Downtown, Suburbs, North Side"
+              placeholder="Enter service areas separated by commas"
             />
             {profileFormik.touched.serviceAreas && profileFormik.errors.serviceAreas && (
               <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.serviceAreas}</span>
