@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
+import * as Yup from 'yup'
 import {
   browseServices,
   cancelBooking,
@@ -12,20 +14,43 @@ import {
 import { getCurrentUser } from '../services/authService'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
+import DraggableGrid from '../components/ui/DraggableGrid'
 import EmptyState from '../components/ui/EmptyState'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import Modal from '../components/ui/Modal'
 import StatCard from '../components/ui/StatCard'
 import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
+import ServiceListingCard from '../components/services/ServiceListingCard'
 import { formatCurrency, formatDate } from '../utils/formatters'
 import { SERVICE_CATEGORY_OPTIONS } from '../constants/serviceCategories'
 
 const CATEGORIES = SERVICE_CATEGORY_OPTIONS
+const getProviderPhone = (service) =>
+  String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
+
+const toTitleCase = (value) =>
+  String(value || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+
+const bookingSchema = Yup.object({
+  date: Yup.string().required('Preferred date and time is required.'),
+  address: Yup.string().trim().min(5, 'Enter a complete service address.').required('Service address is required.'),
+  notes: Yup.string().max(500, 'Notes must be 500 characters or less.'),
+})
+
+const reviewSchema = Yup.object({
+  rating: Yup.number().min(1).max(5).required('Rating is required.'),
+  comment: Yup.string().trim().min(5, 'Review must be at least 5 characters.').required('Comment is required.'),
+})
 
 function UserDashboardNew({ defaultTab = 'dashboard' }) {
   const navigate = useNavigate()
   const [user] = useState(getCurrentUser())
+  const displayName = toTitleCase(user?.name)
   const activeTab = defaultTab
   const [stats, setStats] = useState({})
   const [services, setServices] = useState([])
@@ -45,16 +70,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   
-  const [bookingForm, setBookingForm] = useState({ 
-    date: '', 
-    address: user?.address || '', 
-    notes: '' 
-  })
-  const [reviewForm, setReviewForm] = useState({ 
-    rating: 5, 
-    comment: '' 
-  })
-
   const showToast = (message) => {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
@@ -110,27 +125,30 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     }
   }, [activeTab, loadServices, priceRange, searchQuery, selectedCategory])
 
-  const handleBook = async (event) => {
-    event.preventDefault()
-    if (!bookingService) return
-    setSaving(true)
-    try {
-      await createBooking({
-        serviceId: bookingService._id,
-        date: bookingForm.date,
-        address: bookingForm.address || user?.address || '',
-        notes: bookingForm.notes,
-      })
-      setBookingService(null)
-      setBookingForm({ date: '', address: user?.address || '', notes: '' })
-      showToast('Booking request sent')
-      await loadDashboard()
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Booking failed')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const bookingFormik = useFormik({
+    initialValues: { date: '', address: user?.address || '', notes: '' },
+    validationSchema: bookingSchema,
+    onSubmit: async (values, { resetForm }) => {
+      if (!bookingService) return
+      setSaving(true)
+      try {
+        await createBooking({
+          serviceId: bookingService._id,
+          date: values.date,
+          address: values.address || user?.address || '',
+          notes: values.notes,
+        })
+        setBookingService(null)
+        resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+        showToast('Booking request sent')
+        await loadDashboard()
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Booking failed')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
 
   const handleCancel = async (id) => {
     setSaving(true)
@@ -145,25 +163,28 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     }
   }
 
-  const handleReview = async (event) => {
-    event.preventDefault()
-    setSaving(true)
-    try {
-      await submitReview({
-        bookingId: reviewBooking._id,
-        rating: reviewForm.rating,
-        comment: reviewForm.comment,
-      })
-      setReviewBooking(null)
-      setReviewForm({ rating: 5, comment: '' })
-      showToast('Review submitted')
-      await loadDashboard()
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Unable to submit review')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const reviewFormik = useFormik({
+    initialValues: { rating: 5, comment: '' },
+    validationSchema: reviewSchema,
+    onSubmit: async (values, { resetForm }) => {
+      setSaving(true)
+      try {
+        await submitReview({
+          bookingId: reviewBooking._id,
+          rating: values.rating,
+          comment: values.comment,
+        })
+        setReviewBooking(null)
+        resetForm()
+        showToast('Review submitted')
+        await loadDashboard()
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Unable to submit review')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
 
   const viewServiceDetails = async (service) => {
     try {
@@ -174,12 +195,45 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     }
   }
 
+  const handleServiceMenuAction = async (action, service) => {
+    if (action === 'share') {
+      const shareUrl = `${window.location.origin}/provider/${service._id}`
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: service.title, url: shareUrl })
+        } else if (navigator.clipboard) {
+          await navigator.clipboard.writeText(shareUrl)
+          showToast('Service link copied')
+        }
+      } catch {
+        showToast('Share cancelled')
+      }
+      return
+    }
+
+    if (action === 'save') {
+      showToast('Service saved for later')
+      return
+    }
+
+    if (action === 'report') {
+      showToast('Report received. Our team will review this service.')
+    }
+  }
+
   const resetFilters = () => {
     setSearchQuery('')
     setSelectedCategory('All')
     setPriceRange({ min: '', max: '' })
     setCurrentPage(1)
   }
+
+  const statCards = [
+    { id: 'total-bookings', label: 'Total bookings', value: stats.totalBookings || 0 },
+    { id: 'pending', label: 'Pending', value: stats.pendingBookings || 0 },
+    { id: 'completed', label: 'Completed', value: stats.completedBookings || 0 },
+    { id: 'total-spent', label: 'Total spent', value: formatCurrency(stats.totalSpent) },
+  ]
 
   if (loading) {
     return (
@@ -194,9 +248,14 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Customer</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-900">Welcome, {user?.name}</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Customer</p>
+          <h1 className="mt-2 text-3xl font-black text-slate-900">Customer Dashboard</h1>
           <p className="mt-1 text-slate-500">Book services, track requests, and review completed work.</p>
+          {displayName && (
+            <p className="mt-3 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+              {displayName}
+            </p>
+          )}
         </div>
       </div>
 
@@ -225,12 +284,12 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
 
       {activeTab === 'dashboard' && (
         <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <StatCard label="Total bookings" value={stats.totalBookings || 0} />
-            <StatCard label="Pending" value={stats.pendingBookings || 0} />
-            <StatCard label="Completed" value={stats.completedBookings || 0} />
-            <StatCard label="Total spent" value={formatCurrency(stats.totalSpent)} />
-          </div>
+          <DraggableGrid
+            items={statCards}
+            storageKey="localfixr-user-dashboard-card-order"
+            className="grid gap-4 md:grid-cols-4"
+            renderItem={(card) => <StatCard label={card.label} value={card.value} />}
+          />
 
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-4">
@@ -317,56 +376,28 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           </div>
 
           {/* Services Grid */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            {services.map((service) => {
-              const providerName = service.provider?.businessName || service.provider?.user?.name || 'Unknown Provider'
-              return (
-              <article key={service._id} className="rounded-lg border border-slate-200 p-4 hover:shadow-md transition-all duration-200 ease-in-out hover:border-indigo-300">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 truncate">{service.title || 'Service Title'}</h3>
-                    <p className="mt-1 text-sm text-slate-500 flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-indigo-400"></span>
-                      {service.category || 'Category'}
-                    </p>
-                  </div>
-                  <span className="font-black text-indigo-700 whitespace-nowrap">{formatCurrency(service.price || 0)}</span>
-                </div>
-                <p className="mt-3 line-clamp-2 text-sm text-slate-600">{service.description || 'Service description'}</p>
-                <div className="mt-3 flex items-center gap-1 text-sm text-slate-500">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {service.location || 'All Areas'}
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  {providerName}
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <span className="text-amber-500">{'★'.repeat(Math.floor(service.rating || 0))}{'☆'.repeat(5 - Math.floor(service.rating || 0))}</span>
-                  <span className="text-slate-500">({service.reviewsCount || 0} reviews)</span>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    onClick={() => setBookingService(service)}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    Book Now
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => viewServiceDetails(service)}
-                  >
-                    Details
-                  </Button>
-                </div>
-              </article>
-              )
-            })}
+          <div className="grid gap-5 lg:grid-cols-3">
+            {services.map((service) => (
+              <ServiceListingCard
+                key={service._id}
+                service={service}
+                phone={getProviderPhone(service)}
+                onBook={() => {
+                  bookingFormik.resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+                  setBookingService(service)
+                }}
+                onDetails={() => viewServiceDetails(service)}
+                onContact={() => {
+                  const phone = getProviderPhone(service)
+                  if (phone) {
+                    window.location.href = `tel:+91${phone}`
+                  } else {
+                    showToast('Provider phone number is not available yet')
+                  }
+                }}
+                onMenuAction={handleServiceMenuAction}
+              />
+            ))}
             {services.length === 0 && (
               <div className="lg:col-span-3">
                 <EmptyState 
@@ -438,7 +469,10 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                       {booking.status === 'completed' && (
                         <Button
                           variant="secondary"
-                          onClick={() => setReviewBooking(booking)}
+                          onClick={() => {
+                            reviewFormik.resetForm()
+                            setReviewBooking(booking)
+                          }}
                         >
                           Review
                         </Button>
@@ -457,35 +491,52 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
 
       {/* Booking Modal */}
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
-        <form onSubmit={handleBook}>
+        <form onSubmit={bookingFormik.handleSubmit}>
           <label className="mt-5 block text-sm font-semibold text-slate-700">
-            Preferred date and time
+            Preferred date and time <span className="text-rose-500">*</span>
             <input
+              name="date"
               type="datetime-local"
-              required
-              value={bookingForm.date}
-              onChange={(event) => setBookingForm((current) => ({ ...current, date: event.target.value }))}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+              value={bookingFormik.values.date}
+              onChange={bookingFormik.handleChange}
+              onBlur={bookingFormik.handleBlur}
+              className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                bookingFormik.touched.date && bookingFormik.errors.date ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+              }`}
             />
+            {bookingFormik.touched.date && bookingFormik.errors.date && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.date}</span>
+            )}
           </label>
           <label className="mt-4 block text-sm font-semibold text-slate-700">
-            Service address
+            Service address <span className="text-rose-500">*</span>
             <textarea
-              required
+              name="address"
               rows="2"
-              value={bookingForm.address}
-              onChange={(event) => setBookingForm((current) => ({ ...current, address: event.target.value }))}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+              value={bookingFormik.values.address}
+              onChange={bookingFormik.handleChange}
+              onBlur={bookingFormik.handleBlur}
+              className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                bookingFormik.touched.address && bookingFormik.errors.address ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+              }`}
             />
+            {bookingFormik.touched.address && bookingFormik.errors.address && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.address}</span>
+            )}
           </label>
           <label className="mt-4 block text-sm font-semibold text-slate-700">
             Notes
             <textarea
+              name="notes"
               rows="3"
-              value={bookingForm.notes}
-              onChange={(event) => setBookingForm((current) => ({ ...current, notes: event.target.value }))}
+              value={bookingFormik.values.notes}
+              onChange={bookingFormik.handleChange}
+              onBlur={bookingFormik.handleBlur}
               className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
             />
+            {bookingFormik.touched.notes && bookingFormik.errors.notes && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.notes}</span>
+            )}
           </label>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
@@ -498,26 +549,34 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
 
       {/* Review Modal */}
       <Modal isOpen={Boolean(reviewBooking)} title={reviewBooking ? `Review ${reviewBooking.service?.title}` : ''} onClose={() => setReviewBooking(null)}>
-        <form onSubmit={handleReview}>
+        <form onSubmit={reviewFormik.handleSubmit}>
           <label className="mt-5 block text-sm font-semibold text-slate-700">
-            Rating
+            Rating <span className="text-rose-500">*</span>
             <select
-              value={reviewForm.rating}
-              onChange={(event) => setReviewForm((current) => ({ ...current, rating: Number(event.target.value) }))}
+              name="rating"
+              value={reviewFormik.values.rating}
+              onChange={(event) => reviewFormik.setFieldValue('rating', Number(event.target.value))}
+              onBlur={reviewFormik.handleBlur}
               className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
             >
               {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}
             </select>
           </label>
           <label className="mt-4 block text-sm font-semibold text-slate-700">
-            Comment
+            Comment <span className="text-rose-500">*</span>
             <textarea
-              required
+              name="comment"
               rows="4"
-              value={reviewForm.comment}
-              onChange={(event) => setReviewForm((current) => ({ ...current, comment: event.target.value }))}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+              value={reviewFormik.values.comment}
+              onChange={reviewFormik.handleChange}
+              onBlur={reviewFormik.handleBlur}
+              className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                reviewFormik.touched.comment && reviewFormik.errors.comment ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+              }`}
             />
+            {reviewFormik.touched.comment && reviewFormik.errors.comment && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{reviewFormik.errors.comment}</span>
+            )}
           </label>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setReviewBooking(null)}>Cancel</Button>
@@ -572,7 +631,11 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
             </div>
             
             <div className="flex justify-end">
-              <Button onClick={() => { setBookingService(selectedService); setSelectedService(null); }}>
+              <Button onClick={() => {
+                bookingFormik.resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+                setBookingService(selectedService)
+                setSelectedService(null)
+              }}>
                 Book This Service
               </Button>
             </div>

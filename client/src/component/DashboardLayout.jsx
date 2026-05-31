@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { getCurrentUser, getUserRole, logout } from '../services/authService'
 import Icon from './Icon'
+import logo from '../assets/logo.png'
 
 const roleNavItems = {
   admin: [
@@ -31,6 +32,13 @@ const roleNavItems = {
   ],
 }
 
+const toTitleCase = (value) =>
+  String(value || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+
 const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -38,6 +46,7 @@ const DashboardLayout = ({ children }) => {
   const location = useLocation()
   const user = getCurrentUser()
   const role = getUserRole()
+  const displayName = toTitleCase(user?.name) || 'User'
 
   const navItems = [
     { path: '/', label: 'Home', icon: 'home', exact: true },
@@ -75,9 +84,12 @@ const DashboardLayout = ({ children }) => {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between bg-slate-800 px-6">
-          <Link to="/" className="text-xl font-bold" onClick={() => setSidebarOpen(false)}>
-            LocalFixr
+        <div className="flex h-16 shrink-0 items-center justify-between bg-slate-800 px-5">
+          <Link to="/" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
+            <img src={logo} alt="LocalFixr logo" className="h-10 w-10 rounded-full bg-white object-contain p-1" />
+            <span className="text-xl font-black tracking-tight">
+              Local<span className="text-indigo-300">Fixr</span>
+            </span>
           </Link>
           <button
             type="button"
@@ -91,7 +103,7 @@ const DashboardLayout = ({ children }) => {
 
         <div className="shrink-0 border-b border-slate-700 px-6 py-4">
           <p className="text-sm text-gray-400">Welcome,</p>
-          <p className="truncate font-semibold">{user?.name || 'User'}</p>
+          <p className="truncate font-semibold">{displayName}</p>
           <span className="mt-1 inline-block rounded-full bg-indigo-600 px-2 py-0.5 text-xs capitalize">
             {role === 'service_provider' ? 'Provider' : role}
           </span>
@@ -145,11 +157,14 @@ const DashboardLayout = ({ children }) => {
           >
             <Icon name="menu" className="h-5 w-5" />
           </button>
-          <div className="min-w-0 flex-1 px-3 lg:px-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 lg:px-0">
+            <img src={logo} alt="LocalFixr logo" className="hidden h-10 w-10 rounded-full border border-slate-200 bg-white object-contain p-1 sm:block" />
+            <div className="min-w-0">
             <p className="truncate text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
-              LocalFixr Admin
+              {role === 'service_provider' ? 'LocalFixr Provider' : role === 'admin' ? 'LocalFixr Admin' : 'LocalFixr Customer'}
             </p>
             <h1 className="truncate text-lg font-black text-slate-950">{dashboardTitle}</h1>
+            </div>
           </div>
           <div className="relative">
             <button
@@ -160,11 +175,11 @@ const DashboardLayout = ({ children }) => {
               className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100"
             >
               <div className="hidden text-right sm:block">
-                <p className="max-w-40 truncate text-sm font-bold text-slate-900">{user?.name || 'Admin'}</p>
+                <p className="max-w-40 truncate text-sm font-bold text-slate-900">{displayName}</p>
                 <p className="text-xs capitalize text-slate-500">{role === 'service_provider' ? 'Provider' : role}</p>
               </div>
               <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
-                {(user?.name || 'A').slice(0, 1).toUpperCase()}
+                {displayName.slice(0, 1).toUpperCase()}
               </div>
             </button>
 
@@ -174,7 +189,7 @@ const DashboardLayout = ({ children }) => {
                 className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
               >
                 <div className="border-b border-slate-100 px-3 py-3">
-                  <p className="truncate text-sm font-black text-slate-950">{user?.name || 'Admin'}</p>
+                  <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
                   <p className="truncate text-xs text-slate-500">{user?.email || 'admin@localfixr'}</p>
                 </div>
                 <button

@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
+import { useFormik } from 'formik'
 import { Link, useNavigate, useParams } from 'react-router'
+import * as Yup from 'yup'
 import { createBooking, getPublicServiceDetails, getServiceReviews } from '../services/dashboardService'
 import { getCurrentUser, isAuthenticated, isUser } from '../services/authService'
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`
+
+const bookingSchema = Yup.object({
+  date: Yup.string().required('Preferred date and time is required.'),
+  address: Yup.string().trim().min(5, 'Enter a complete service address.').required('Address is required.'),
+  notes: Yup.string().max(500, 'Notes must be 500 characters or less.'),
+})
 
 function ProviderDetails() {
   const { id } = useParams()
@@ -15,7 +23,6 @@ function ProviderDetails() {
   const [toast, setToast] = useState('')
   const [bookingOpen, setBookingOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [bookingForm, setBookingForm] = useState({ date: '', address: getCurrentUser()?.address || '', notes: '' })
 
   const showToast = (message) => {
     setToast(message)
@@ -43,34 +50,37 @@ function ProviderDetails() {
     loadDetails()
   }, [id])
 
-  const handleBooking = async (event) => {
-    event.preventDefault()
-    if (!isAuthenticated()) {
-      showToast('Please log in as a customer to book a service')
-      return
-    }
-    if (!isUser()) {
-      showToast('Only customer accounts can book services')
-      return
-    }
+  const bookingFormik = useFormik({
+    initialValues: { date: '', address: getCurrentUser()?.address || '', notes: '' },
+    validationSchema: bookingSchema,
+    onSubmit: async (values, { resetForm }) => {
+      if (!isAuthenticated()) {
+        showToast('Please log in as a customer to book a service')
+        return
+      }
+      if (!isUser()) {
+        showToast('Only customer accounts can book services')
+        return
+      }
 
-    setSaving(true)
-    try {
-      await createBooking({
-        serviceId: service._id,
-        date: bookingForm.date,
-        address: bookingForm.address,
-        notes: bookingForm.notes,
-      })
-      setBookingOpen(false)
-      setBookingForm({ date: '', address: getCurrentUser()?.address || '', notes: '' })
-      showToast('Booking request sent')
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Booking failed')
-    } finally {
-      setSaving(false)
-    }
-  }
+      setSaving(true)
+      try {
+        await createBooking({
+          serviceId: service._id,
+          date: values.date,
+          address: values.address,
+          notes: values.notes,
+        })
+        setBookingOpen(false)
+        resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+        showToast('Booking request sent')
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Booking failed')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
 
   if (loading) {
     return (
@@ -153,7 +163,14 @@ function ProviderDetails() {
                 Call provider
               </a>
             )}
-            <button type="button" onClick={() => setBookingOpen(true)} className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white">
+            <button
+              type="button"
+              onClick={() => {
+                bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                setBookingOpen(true)
+              }}
+              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white"
+            >
               Book service
             </button>
           </div>
@@ -178,36 +195,53 @@ function ProviderDetails() {
 
       {bookingOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4">
-          <form onSubmit={handleBooking} className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+          <form onSubmit={bookingFormik.handleSubmit} className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-2xl font-black text-slate-900">Book {service.title}</h2>
             <label className="mt-5 block text-sm font-semibold text-slate-700">
-              Preferred date and time
+              Preferred date and time <span className="text-rose-500">*</span>
               <input
+                name="date"
                 type="datetime-local"
-                required
-                value={bookingForm.date}
-                onChange={(event) => setBookingForm((current) => ({ ...current, date: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                value={bookingFormik.values.date}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  bookingFormik.touched.date && bookingFormik.errors.date ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               />
+              {bookingFormik.touched.date && bookingFormik.errors.date && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.date}</span>
+              )}
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Address
+              Address <span className="text-rose-500">*</span>
               <textarea
-                required
+                name="address"
                 rows="2"
-                value={bookingForm.address}
-                onChange={(event) => setBookingForm((current) => ({ ...current, address: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                value={bookingFormik.values.address}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  bookingFormik.touched.address && bookingFormik.errors.address ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               />
+              {bookingFormik.touched.address && bookingFormik.errors.address && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.address}</span>
+              )}
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Notes
               <textarea
+                name="notes"
                 rows="3"
-                value={bookingForm.notes}
-                onChange={(event) => setBookingForm((current) => ({ ...current, notes: event.target.value }))}
+                value={bookingFormik.values.notes}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
                 className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
               />
+              {bookingFormik.touched.notes && bookingFormik.errors.notes && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.notes}</span>
+              )}
             </label>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setBookingOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 font-semibold">Close</button>
@@ -219,7 +253,11 @@ function ProviderDetails() {
         </div>
       )}
 
-      {toast && <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-lg">{toast}</div>}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </main>
   )
 }

@@ -58,6 +58,16 @@ const iconPaths = {
       strokeWidth="2"
     />
   ),
+  chevronDown: (
+    <path
+      d="m7 10 5 5 5-5"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    />
+  ),
   star: (
     <path
       d="m12 3.8 2.5 5 5.5.8-4 3.9.9 5.5L12 16.8 7.1 19l.9-5.5-4-3.9 5.5-.8 2.5-5Z"
@@ -110,6 +120,27 @@ const iconPaths = {
       d="m12 3 1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2L12 3Z"
       fill="currentColor"
     />
+  ),
+  paint: (
+    <>
+      <path
+        d="M4 5.5A2.5 2.5 0 0 1 6.5 3h8A2.5 2.5 0 0 1 17 5.5V7h1.5A1.5 1.5 0 0 1 20 8.5v3A1.5 1.5 0 0 1 18.5 13H13v2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <path
+        d="M7 7h10M6.5 3A2.5 2.5 0 0 0 4 5.5 2.5 2.5 0 0 0 6.5 8H17"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <rect x="11" y="15" width="4" height="6" rx="1" fill="currentColor" />
+    </>
   ),
   hammer: (
     <path

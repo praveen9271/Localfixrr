@@ -1,5 +1,9 @@
 import User from '../models/User.js';
 import Provider from '../models/Provider.js';
+import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
+import Notification from '../models/Notification.js';
 import PendingRegistration from '../models/PendingRegistration.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -19,6 +23,11 @@ import {
 } from '../services/otpService.js';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'localfixr-dev-secret';
+const getGoogleClientIds = () =>
+  String(process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_IDS || '')
+    .split(',')
+    .map((clientId) => clientId.trim())
+    .filter(Boolean);
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -37,6 +46,7 @@ const isStrongPassword = (password) =>
 const RESET_TOKEN_TTL = '10m';
 const DATABASE_UNAVAILABLE_MESSAGE =
   'Database connection is unavailable. Check MongoDB Atlas Network Access IP whitelist and MONGODB_URI, then restart the server.';
+const canExposeDevOtps = () => process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_OTPS === 'true';
 
 const isDatabaseConnectionError = (error) => {
   const message = String(error?.message || '').toLowerCase();
@@ -66,12 +76,60 @@ const formatUser = (user, provider) => ({
   id: user._id,
   name: user.name,
   email: user.email,
-  phone: user.phone,
-  address: user.address,
+  phone: user.phone || '',
+  address: user.address || '',
   role: user.role,
   isActive: user.isActive,
+  isEmailVerified: user.isEmailVerified,
+  authProvider: user.authProvider,
+  profileComplete: Boolean(user.phone && user.address),
   providerId: provider?._id || user.providerProfile || null,
 });
+
+const verifyGoogleCredential = async (credential) => {
+  const googleClientIds = getGoogleClientIds();
+  if (!googleClientIds.length) {
+    const error = new Error('Google authentication is not configured');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!credential) {
+    const error = new Error('Google credential is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+  );
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(payload.error_description || 'Google credential could not be verified');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!googleClientIds.includes(payload.aud)) {
+    const error = new Error('Google credential audience is invalid');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (payload.email_verified !== true && payload.email_verified !== 'true') {
+    const error = new Error('Google email is not verified');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return {
+    googleId: payload.sub,
+    email: normalizeEmail(payload.email),
+    name: normalizeText(payload.name) || normalizeEmail(payload.email).split('@')[0],
+    avatar: normalizeText(payload.picture),
+  };
+};
 
 const validateRegistrationPayload = (body) => {
   const normalizedName = normalizeText(body.name);
@@ -117,6 +175,11 @@ const getPending = async (email, phone) => {
   }).select('+emailOtpHash +passwordHash');
 };
 
+const getResendWaitSeconds = (pending) => {
+  const elapsedSeconds = Math.floor((Date.now() - new Date(pending.lastSentAt).getTime()) / 1000);
+  return Math.max(0, OTP_RESEND_SECONDS - elapsedSeconds);
+};
+
 const sendPendingEmailOtp = async (pending) => {
   const devOtps = {};
   const emailOtp = generateOtp();
@@ -124,7 +187,7 @@ const sendPendingEmailOtp = async (pending) => {
   pending.emailOtpHash = hashOtp(emailOtp, pending.email);
   pending.emailAttempts = 0;
   await sendEmailOtp({ email: pending.email, name: pending.name, otp: emailOtp });
-  if (process.env.NODE_ENV !== 'production') devOtps.emailOtp = emailOtp;
+  if (canExposeDevOtps()) devOtps.emailOtp = emailOtp;
 
   pending.lastSentAt = new Date();
   pending.resendCount += 1;
@@ -184,7 +247,8 @@ const startRegistration = async (req, res) => {
       email: pending.email,
       phone: pending.phone,
       expiresAt: pending.expiresAt,
-      ...(process.env.NODE_ENV !== 'production' ? { devOtps: { emailOtp } } : {}),
+      retryAfterSeconds: OTP_RESEND_SECONDS,
+      ...(canExposeDevOtps() ? { devOtps: { emailOtp } } : {}),
     });
   } catch (error) {
     console.error('Start registration error:', error);
@@ -207,7 +271,12 @@ const resendRegistrationOtp = async (req, res) => {
       return res.status(429).json({ success: false, message: 'Maximum OTP resend limit reached. Please start registration again.' });
     }
     if (!canResend(pending)) {
-      return res.status(429).json({ success: false, message: `Please wait ${OTP_RESEND_SECONDS} seconds before requesting another OTP.` });
+      const retryAfterSeconds = getResendWaitSeconds(pending);
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${retryAfterSeconds} seconds before requesting another OTP.`,
+        retryAfterSeconds,
+      });
     }
 
     const devOtps = await sendPendingEmailOtp(pending);
@@ -216,7 +285,8 @@ const resendRegistrationOtp = async (req, res) => {
       success: true,
       message: 'Verification code resent.',
       expiresAt: pending.expiresAt,
-      ...(process.env.NODE_ENV !== 'production' ? { devOtps } : {}),
+      retryAfterSeconds: OTP_RESEND_SECONDS,
+      ...(canExposeDevOtps() ? { devOtps } : {}),
     });
   } catch (error) {
     console.error('Resend OTP error:', error);
@@ -575,6 +645,69 @@ const registerUser = async (req, res) => {
   }
 };
 
+// @desc    Login or register with Google
+// @route   POST /api/auth/google
+// @access  Public
+const googleAuth = async (req, res) => {
+  try {
+    if (!requireDatabaseConnection(res)) return;
+
+    const googleProfile = await verifyGoogleCredential(req.body.credential);
+    if (!googleProfile.email) {
+      return res.status(400).json({ success: false, message: 'Google account email is required' });
+    }
+
+    let user = await User.findOne({
+      $or: [
+        { email: googleProfile.email },
+        { googleId: googleProfile.googleId },
+      ],
+    });
+    let created = false;
+
+    if (user) {
+      if (!user.isActive || user.isBlocked) {
+        return res.status(403).json({ success: false, message: 'Your account is blocked or inactive' });
+      }
+
+      const nextProvider = user.authProvider === 'local' ? 'local_google' : user.authProvider || 'google';
+      user.googleId = user.googleId || googleProfile.googleId;
+      user.authProvider = nextProvider;
+      user.isEmailVerified = true;
+      if (!user.avatar && googleProfile.avatar) user.avatar = googleProfile.avatar;
+      if (!user.name && googleProfile.name) user.name = googleProfile.name;
+      await user.save({ validateBeforeSave: false });
+    } else {
+      user = await User.create({
+        name: googleProfile.name,
+        email: googleProfile.email,
+        avatar: googleProfile.avatar,
+        googleId: googleProfile.googleId,
+        authProvider: 'google',
+        role: 'user',
+        isEmailVerified: true,
+      });
+      created = true;
+    }
+
+    const token = generateToken(user._id, user.role);
+
+    return res.status(created ? 201 : 200).json({
+      success: true,
+      message: created ? 'Google account created successfully' : 'Google login successful',
+      token,
+      user: formatUser(user, null),
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Google authentication failed',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
+    });
+  }
+};
+
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
@@ -713,8 +846,85 @@ const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Delete current user account and related marketplace data
+// @route   DELETE /api/auth/account
+// @access  Private
+const deleteAccount = async (req, res) => {
+  try {
+    const confirmation = String(req.body?.confirmation || '').trim();
+    if (confirmation !== 'DELETE') {
+      return res.status(400).json({ success: false, message: 'Type DELETE to confirm account deletion' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin accounts cannot be deleted from self-service settings.',
+      });
+    }
+
+    const provider = user.role === 'service_provider'
+      ? await Provider.findOne({ user: user._id })
+      : null;
+
+    const pendingRegistrationQuery = {
+      $or: [
+        user.email ? { email: user.email } : null,
+        user.phone ? { phone: user.phone } : null,
+      ].filter(Boolean),
+    };
+
+    const cleanupTasks = [
+      Notification.deleteMany({ recipient: user._id }),
+      PendingRegistration.deleteMany(pendingRegistrationQuery.$or.length ? pendingRegistrationQuery : { _id: null }),
+    ];
+
+    if (provider) {
+      cleanupTasks.push(
+        Service.deleteMany({ provider: provider._id }),
+        Booking.deleteMany({
+          $or: [
+            { customer: user._id },
+            { provider: provider._id },
+          ],
+        }),
+        Review.deleteMany({
+          $or: [
+            { user: user._id },
+            { provider: provider._id },
+          ],
+        }),
+        Provider.deleteOne({ _id: provider._id }),
+      );
+    } else {
+      cleanupTasks.push(
+        Booking.deleteMany({ customer: user._id }),
+        Review.deleteMany({ user: user._id }),
+      );
+    }
+
+    await Promise.all(cleanupTasks);
+    await user.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your account and related data were deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to delete account', error: error.message });
+  }
+};
+
 export {
   completeRegistration,
+  deleteAccount,
+  googleAuth,
   resendRegistrationOtp,
   registerUser,
   startRegistration,

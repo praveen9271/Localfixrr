@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
+import * as Yup from 'yup'
 import { getPublicServices } from '../services/dashboardService'
 import { subscribeNewsletter } from '../services/newsletterService'
 import { scrollToSection } from '../utils/scroll'
 import { button3d } from '../utils/tailwindStyles'
-import Icon from './Icon'
 import logo from '../assets/logo.png'
 
 const quickLinks = [
@@ -22,16 +23,15 @@ const supportLinks = [
   { label: 'Refund Policy', to: '/support/refund-policy' },
 ]
 
-const socialLinks = [
-  { name: 'facebook', label: 'Facebook', href: 'https://facebook.com' },
-  { name: 'instagram', label: 'Instagram', href: 'https://instagram.com' },
-  { name: 'twitter', label: 'Twitter', href: 'https://x.com' },
-  { name: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/916280008301' },
-]
+const newsletterSchema = Yup.object({
+  email: Yup.string()
+    .trim()
+    .email('Enter a valid email address.')
+    .required('Email is required.'),
+})
 
 function Footer({ onToast }) {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [subscribing, setSubscribing] = useState(false)
   const [services, setServices] = useState([])
@@ -62,17 +62,11 @@ function Footer({ onToast }) {
     }
   }
 
-  const handleSubscribe = async (event) => {
-    event.preventDefault()
-    const cleanEmail = email.trim().toLowerCase()
-    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)
-
-    if (!isValid) {
-      setMessage('Enter a valid email address.')
-      onToast?.('Enter a valid email address.')
-      return
-    }
-
+  const newsletterFormik = useFormik({
+    initialValues: { email: '' },
+    validationSchema: newsletterSchema,
+    onSubmit: async (values, { resetForm }) => {
+      const cleanEmail = values.email.trim().toLowerCase()
     setSubscribing(true)
     setMessage('')
 
@@ -80,7 +74,7 @@ function Footer({ onToast }) {
       const response = await subscribeNewsletter({ email: cleanEmail })
       setMessage(response.message || 'Subscription email sent successfully.')
       onToast?.(response.message || 'Subscription email sent successfully.')
-      setEmail('')
+      resetForm()
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Unable to send subscription email.'
       setMessage(errorMessage)
@@ -88,7 +82,8 @@ function Footer({ onToast }) {
     } finally {
       setSubscribing(false)
     }
-  }
+    },
+  })
 
   return (
     <footer className="mt-8 bg-slate-950 text-slate-200">
@@ -110,26 +105,11 @@ function Footer({ onToast }) {
             Phagwara, Punjab.
           </p>
 
-          <div className="mt-6 flex gap-3">
-            {socialLinks.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                target="_blank"
-                rel="noreferrer"
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-indigo-400 hover:text-white"
-                aria-label={item.label}
-              >
-                <Icon name={item.name} className="h-5 w-5" />
-              </a>
-            ))}
-          </div>
-
           <div className="mt-6 space-y-2 text-sm text-slate-400">
-            <a href="tel:+916280008301" className="block hover:text-indigo-300">
+            <a href="tel:+916280008301" className="block cursor-pointer hover:text-indigo-300">
               +91 62800 08301
             </a>
-            <a href="mailto:localfixr@gmail.com" className="block hover:text-indigo-300">
+            <a href="mailto:localfixr@gmail.com" className="block cursor-pointer hover:text-indigo-300">
               localfixr@gmail.com
             </a>
             <p>Phagwara, Punjab, India</p>
@@ -144,7 +124,7 @@ function Footer({ onToast }) {
                 key={link.label}
                 type="button"
                 onClick={() => navigateTo(link.to)}
-                className="block transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
+                className="block cursor-pointer transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
               >
                 {link.label}
               </button>
@@ -162,7 +142,7 @@ function Footer({ onToast }) {
                 onClick={() =>
                   navigate(`/services?service=${encodeURIComponent(service)}`)
                 }
-                className="block transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
+                className="block cursor-pointer transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
               >
                 {service}
               </button>
@@ -179,7 +159,7 @@ function Footer({ onToast }) {
                 key={link.to}
                 type="button"
                 onClick={() => navigate(link.to)}
-                className="block transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
+                className="block cursor-pointer transition duration-300 hover:-translate-y-0.5 hover:text-indigo-300"
               >
                 {link.label}
               </button>
@@ -187,27 +167,39 @@ function Footer({ onToast }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubscribe}>
+        <form onSubmit={newsletterFormik.handleSubmit}>
           <p className="text-lg font-bold text-white">Newsletter</p>
           <p className="mt-5 text-sm leading-7 text-slate-400">
             Subscribe to get updates and offers in your inbox.
           </p>
+          <label className="mt-5 block text-xs font-bold text-slate-300">
+            Email <span className="text-rose-400">*</span>
+          </label>
           <input
+            name="email"
             type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={newsletterFormik.values.email}
+            onChange={newsletterFormik.handleChange}
+            onBlur={newsletterFormik.handleBlur}
             placeholder="Enter your email"
             disabled={subscribing}
-            className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-400"
+            className={`mt-2 w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-400 ${
+              newsletterFormik.touched.email && newsletterFormik.errors.email
+                ? 'border-rose-400/70'
+                : 'border-white/10'
+            }`}
           />
+          {newsletterFormik.touched.email && newsletterFormik.errors.email && (
+            <p className="mt-2 text-sm font-semibold text-rose-300">{newsletterFormik.errors.email}</p>
+          )}
           <button
             type="submit"
             disabled={subscribing}
-            className={`${button3d} mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60`}
+            className={`${button3d} mt-4 w-full cursor-pointer rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60`}
           >
             {subscribing ? 'Sending...' : 'Subscribe'}
           </button>
-          {message && <p className="mt-3 text-sm text-indigo-200">{message}</p>}
+          {message && <p className={`mt-3 text-sm ${message.toLowerCase().includes('unable') ? 'text-rose-300' : 'text-indigo-200'}`}>{message}</p>}
         </form>
       </div>
 

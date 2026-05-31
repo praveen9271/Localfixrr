@@ -202,6 +202,11 @@ export const changeUserPassword = async (passwordData) => {
   return put('/auth/password', passwordData);
 };
 
+export const deleteAccount = async (confirmation) => {
+  const response = await api.delete('/auth/account', { data: { confirmation } });
+  return response.data;
+};
+
 // Provider Reviews API
 export const getProviderReviews = async () => {
   return get('/provider/reviews');

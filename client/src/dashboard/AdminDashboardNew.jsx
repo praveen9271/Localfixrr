@@ -17,10 +17,10 @@ import {
 } from 'recharts'
 import {
   Activity,
+  ArrowRight,
   Bell,
   CalendarCheck,
   CheckCircle2,
-  ChevronRight,
   CircleDollarSign,
   ClipboardList,
   Download,
@@ -67,6 +67,7 @@ import {
 } from '../services/dashboardService'
 import Alert from '../components/ui/Alert'
 import ConfirmModal from '../components/ui/ConfirmModal'
+import DraggableGrid from '../components/ui/DraggableGrid'
 import EmptyState from '../components/ui/EmptyState'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import Toast from '../components/ui/Toast'
@@ -471,8 +472,11 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
 
         {activeTab === 'dashboard' && (
           <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {kpis.map((kpi) => (
+            <DraggableGrid
+              items={kpis}
+              storageKey="localfixr-admin-dashboard-card-order"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+              renderItem={(kpi) => (
                 <KpiCard
                   key={kpi.label}
                   {...kpi}
@@ -482,8 +486,8 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                     navigate(kpi.path)
                   }}
                 />
-              ))}
-            </div>
+              )}
+            />
 
             <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
               <Panel className="p-5">
@@ -567,7 +571,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
               <Panel>
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                   <h2 className="text-lg font-black text-slate-950">Latest Bookings</h2>
-                  <button type="button" onClick={() => navigate('/dashboard/admin/bookings')} className="inline-flex items-center gap-1 text-sm font-bold text-indigo-600">Open <ChevronRight className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => navigate('/dashboard/admin/bookings')} className="inline-flex items-center gap-1 text-sm font-bold text-indigo-600">Open <ArrowRight className="h-4 w-4" /></button>
                 </div>
                 <DataTable
                   rows={statsPayload.latestBookings || bookings.slice(0, 6)}

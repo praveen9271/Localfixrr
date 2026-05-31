@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import Icon from '../component/Icon'
 import Hero from '../Sections/Hero'
 import HowItWorks from '../Sections/HowItWorks'
 import ServicesSection from '../Sections/ServicesSection'
 import Stats from '../Sections/Stats'
 import WhyChooseUs from '../Sections/WhyChooseUs'
+import ServiceListingCard from '../components/services/ServiceListingCard'
 import { getPublicServices } from '../services/dashboardService'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 import { scrollToSection } from '../utils/scroll'
@@ -72,6 +73,8 @@ const steps = [
   },
 ]
 
+const normalizeIndianPhone = (value) => String(value || '').replace(/\D/g, '').slice(-10)
+
 function Home({ darkMode, onToast }) {
   const navigate = useNavigate()
   const [services, setServices] = useState([])
@@ -120,6 +123,34 @@ function Home({ darkMode, onToast }) {
 
   const topServices = services.slice(0, 4)
 
+  const handleServiceMenuAction = (action, service) => {
+    const title = service?.title || 'service'
+
+    if (action === 'share') {
+      const url = `${window.location.origin}/provider/${service?._id || ''}`
+      navigator.clipboard?.writeText(url)
+      onToast?.('Service link copied')
+      return
+    }
+
+    if (action === 'save') {
+      onToast?.(`${title} saved`)
+      return
+    }
+
+    if (action === 'report') {
+      onToast?.('Report option received')
+      return
+    }
+
+    onToast?.('Open details to continue')
+  }
+
+  const handleServiceContact = (service) => {
+    const phone = normalizeIndianPhone(service?.provider?.user?.phone)
+    onToast?.(phone ? `Provider phone: +91 ${phone}` : 'Provider phone not available')
+  }
+
   return (
     <main>
       <Hero darkMode={darkMode} onToast={onToast} />
@@ -130,67 +161,47 @@ function Home({ darkMode, onToast }) {
         <HowItWorks steps={steps} />
       </div>
 
-      <section className="mx-auto max-w-7xl px-4 py-18 sm:px-6 lg:px-8">
-        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="mx-auto max-w-7xl px-4 pb-20 pt-12 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-center text-4xl font-black tracking-tight text-slate-900 sm:text-left">
             Live <span className="text-indigo-500">Services</span> Near You
           </p>
 
-          <div className="flex items-center justify-center gap-3 sm:justify-end">
-            <button
-              type="button"
-              onClick={() => scrollToSection('services')}
-              className={`${button3dSubtle} flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-indigo-200 hover:text-indigo-500`}
-            >
-              <Icon name="arrowLeft" className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/services')}
-              className={`${button3dSubtle} flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-indigo-200 hover:text-indigo-500`}
-            >
-              <Icon name="arrowRight" className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/services')}
+            className={`${button3dSubtle} inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-5 text-sm font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50`}
+          >
+            View all
+            <Icon name="arrowRight" className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
           {topServices.map((service) => (
-            <article
+            <ServiceListingCard
               key={service._id}
-              className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-2 hover:border-indigo-100 hover:shadow-[0_24px_55px_rgba(79,70,229,0.16)]"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-violet-500 opacity-0 transition duration-300 group-hover:opacity-100" />
-              <div className="flex items-start gap-4">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-600 transition duration-300 group-hover:-translate-y-1 group-hover:bg-indigo-600 group-hover:text-white">
-                  <Icon name="wrench" className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 transition group-hover:text-indigo-700">{service.title}</h3>
-                  <p className="mt-1 text-sm font-semibold text-indigo-600">{service.category}</p>
-                </div>
-              </div>
-              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{service.description}</p>
-              <p className="mt-4 text-sm text-slate-500">
-                Provider: <span className="font-semibold text-slate-800">{service.provider?.businessName || service.provider?.user?.name || 'Provider'}</span>
-              </p>
-              <Link
-                to={`/provider/${service._id}`}
-                className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_14px_28px_rgba(79,70,229,0.22)]"
-              >
-                View details
-              </Link>
-            </article>
+              service={service}
+              phone={normalizeIndianPhone(service?.provider?.user?.phone)}
+              compact
+              showMenuDetails
+              showActionsMenu={false}
+              primaryLabel="Book now"
+              onDetails={(selected) => navigate(`/provider/${selected._id}`)}
+              onBook={(selected) => navigate(`/provider/${selected._id}`)}
+              onContact={handleServiceContact}
+              onMenuAction={handleServiceMenuAction}
+            />
           ))}
           {topServices.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 xl:col-span-4">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-6 text-center text-slate-500 xl:col-span-4">
               No live services are available yet.
             </div>
           )}
         </div>
       </section>
 
-      <section id="contact" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <section id="contact" className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-indigo-600 via-blue-600 to-violet-600 px-6 py-8 text-white shadow-[0_30px_70px_rgba(79,70,229,0.35)] sm:px-10 lg:flex lg:items-center lg:justify-between">
           <div className="relative max-w-xl">
             <p className="text-3xl font-black tracking-tight sm:text-4xl">

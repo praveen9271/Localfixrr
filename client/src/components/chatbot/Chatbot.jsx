@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFormik } from 'formik'
 import { Bot, ChevronDown, Maximize2, MessageCircle, Minimize2, Send, Sparkles, X } from 'lucide-react'
+import * as Yup from 'yup'
 import { sendChatMessage } from '../../services/chatService'
 
 const CHAT_MESSAGES_KEY = 'localfixr-chat-messages'
@@ -18,6 +20,10 @@ const welcomeMessage = {
   text: 'Hi! I am LocalFixr AI. I can help with bookings, providers, payments, refunds, and service questions. How can I help?',
   createdAt: new Date().toISOString(),
 }
+
+const chatSchema = Yup.object({
+  message: Yup.string().trim().required('Type a message first.').max(1000, 'Message must be 1000 characters or less.'),
+})
 
 const safeJsonParse = (value, fallback) => {
   try {
@@ -75,7 +81,6 @@ function ChatMessage({ message }) {
 function Chatbot() {
   const [open, setOpen] = useState(false)
   const [maximized, setMaximized] = useState(false)
-  const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState('')
   const [messages, setMessages] = useState([welcomeMessage])
@@ -110,7 +115,13 @@ function Chatbot() {
 
   const unread = useMemo(() => !open && messages.length <= 1, [messages.length, open])
 
-  const submitMessage = async (text = input) => {
+  const chatFormik = useFormik({
+    initialValues: { message: '' },
+    validationSchema: chatSchema,
+    onSubmit: (values, { resetForm }) => submitMessage(values.message, resetForm),
+  })
+
+  const submitMessage = async (text = chatFormik.values.message, resetForm) => {
     const cleanText = text.trim()
     if (!cleanText || loading) return
 
@@ -122,7 +133,8 @@ function Chatbot() {
     }
 
     setMessages((current) => [...current, userMessage])
-    setInput('')
+    resetForm?.()
+    if (!resetForm) chatFormik.resetForm()
     setLoading(true)
 
     try {
@@ -242,15 +254,18 @@ function Chatbot() {
             </div>
 
             <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                submitMessage()
-              }}
+              onSubmit={chatFormik.handleSubmit}
               className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100"
             >
+              <label htmlFor="localfixr-chat-message" className="sr-only">
+                Message <span className="text-rose-500">*</span>
+              </label>
               <input
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
+                id="localfixr-chat-message"
+                name="message"
+                value={chatFormik.values.message}
+                onChange={chatFormik.handleChange}
+                onBlur={chatFormik.handleBlur}
                 maxLength={1000}
                 placeholder="Ask LocalFixr AI..."
                 className="min-w-0 flex-1 bg-transparent px-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
@@ -264,13 +279,16 @@ function Chatbot() {
               </button>
               <button
                 type="submit"
-                disabled={loading || !input.trim()}
+                disabled={loading || !chatFormik.values.message.trim()}
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" />
               </button>
             </form>
+            {chatFormik.touched.message && chatFormik.errors.message && (
+              <p className="mt-2 text-xs font-semibold text-rose-600">{chatFormik.errors.message}</p>
+            )}
           </div>
         </div>
       </div>

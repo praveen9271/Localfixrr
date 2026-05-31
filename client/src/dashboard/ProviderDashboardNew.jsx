@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
+import * as Yup from 'yup'
 import { getCurrentUser } from '../services/authService'
 import {
   createService,
@@ -15,7 +17,9 @@ import {
 } from '../services/dashboardService'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
+import DeleteAccountPanel from '../components/account/DeleteAccountPanel'
 import ConfirmModal from '../components/ui/ConfirmModal'
+import DraggableGrid from '../components/ui/DraggableGrid'
 import EmptyState from '../components/ui/EmptyState'
 import FormField from '../components/ui/FormField'
 import LoadingGrid from '../components/ui/LoadingGrid'
@@ -34,18 +38,49 @@ const blankService = {
   status: 'active',
 }
 
+const serviceSchema = Yup.object({
+  title: Yup.string().trim().min(3, 'Title must be at least 3 characters.').required('Title is required.'),
+  category: Yup.string().required('Category is required.'),
+  price: Yup.number().typeError('Enter a valid price.').min(0, 'Price cannot be negative.').required('Price is required.'),
+  location: Yup.string().trim().max(120, 'Location is too long.'),
+  description: Yup.string().trim().min(10, 'Description must be at least 10 characters.').required('Description is required.'),
+  status: Yup.string().oneOf(['active', 'inactive']).required('Status is required.'),
+})
+
+const providerProfileSchema = Yup.object({
+  businessName: Yup.string().trim().min(2, 'Business name is required.').required('Business name is required.'),
+  bio: Yup.string().trim().max(600, 'Bio must be 600 characters or less.'),
+  serviceAreas: Yup.string().trim().required('Service areas are required.'),
+  skills: Yup.string().required('Service work is required.'),
+  available: Yup.boolean(),
+})
+
+const normalizeServiceIdentity = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const toTitleCase = (value) =>
+  String(value || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+
 function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   const navigate = useNavigate()
   const [user] = useState(getCurrentUser())
+  const displayName = toTitleCase(profile?.businessName || user?.name)
   const activeTab = defaultTab
   const [stats, setStats] = useState({})
   const [services, setServices] = useState([])
   const [bookings, setBookings] = useState([])
   const [reviews, setReviews] = useState([])
   const [profile, setProfile] = useState(null)
-  const [serviceForm, setServiceForm] = useState(blankService)
   const [editingId, setEditingId] = useState(null)
-  const [profileForm, setProfileForm] = useState({ businessName: '', bio: '', serviceAreas: '', skills: '', available: true })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -56,6 +91,66 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
   }
+
+  const serviceFormik = useFormik({
+    initialValues: blankService,
+    validationSchema: serviceSchema,
+    onSubmit: async (values, { resetForm }) => {
+      const duplicateService = services.find((service) =>
+        service._id !== editingId &&
+        normalizeServiceIdentity(service.title) === normalizeServiceIdentity(values.title) &&
+        service.category === values.category,
+      )
+
+      if (duplicateService) {
+        showToast('You already have this service listed in the same category')
+        return
+      }
+
+      setSaving(true)
+      try {
+        const payload = { ...values, price: Number(values.price) }
+        if (editingId) {
+          await updateService(editingId, payload)
+          showToast('Service updated')
+        } else {
+          await createService(payload)
+          showToast('Service created')
+        }
+        resetForm({ values: blankService })
+        setEditingId(null)
+        await loadDashboard()
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Unable to save service')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
+
+  const profileFormik = useFormik({
+    initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', available: true },
+    validationSchema: providerProfileSchema,
+    onSubmit: async (values) => {
+      setSaving(true)
+      try {
+        await updateProviderProfile({
+          businessName: values.businessName,
+          bio: values.bio,
+          serviceAreas: values.serviceAreas.split(',').map((item) => item.trim()).filter(Boolean),
+          skills: values.skills ? [values.skills] : [],
+          available: values.available,
+        })
+        showToast('Profile updated')
+        await loadDashboard()
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Unable to update profile')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
+  const { setValues: setProviderProfileValues } = profileFormik
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -72,7 +167,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       setBookings(bookingsData.bookings || [])
       const nextProfile = profileData.provider
       setProfile(nextProfile)
-      setProfileForm({
+      setProviderProfileValues({
         businessName: nextProfile?.businessName || '',
         bio: nextProfile?.bio || '',
         serviceAreas: (nextProfile?.serviceAreas || []).join(', '),
@@ -84,7 +179,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setProviderProfileValues])
 
   const loadReviews = useCallback(async () => {
     try {
@@ -106,34 +201,13 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   }, [activeTab, loadDashboard, loadReviews])
 
   const resetServiceForm = () => {
-    setServiceForm(blankService)
+    serviceFormik.resetForm({ values: blankService })
     setEditingId(null)
-  }
-
-  const handleServiceSubmit = async (event) => {
-    event.preventDefault()
-    setSaving(true)
-    try {
-      const payload = { ...serviceForm, price: Number(serviceForm.price) }
-      if (editingId) {
-        await updateService(editingId, payload)
-        showToast('Service updated')
-      } else {
-        await createService(payload)
-        showToast('Service created')
-      }
-      resetServiceForm()
-      await loadDashboard()
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Unable to save service')
-    } finally {
-      setSaving(false)
-    }
   }
 
   const startEdit = (service) => {
     setEditingId(service._id)
-    setServiceForm({
+    serviceFormik.setValues({
       title: service.title || '',
       category: service.category || '',
       price: service.price || '',
@@ -178,26 +252,6 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     }
   }
 
-  const handleProfile = async (event) => {
-    event.preventDefault()
-    setSaving(true)
-    try {
-      await updateProviderProfile({
-        businessName: profileForm.businessName,
-        bio: profileForm.bio,
-        serviceAreas: profileForm.serviceAreas.split(',').map((item) => item.trim()).filter(Boolean),
-        skills: profileForm.skills ? [profileForm.skills] : [],
-        available: profileForm.available,
-      })
-      showToast('Profile updated')
-      await loadDashboard()
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Unable to update profile')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -207,23 +261,35 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     )
   }
 
+  const statCards = [
+    { id: 'services', label: 'Services', value: stats.totalServices || 0 },
+    { id: 'active', label: 'Active', value: stats.activeServices || 0 },
+    { id: 'pending', label: 'Pending', value: stats.pendingBookings || 0 },
+    { id: 'completed', label: 'Completed', value: stats.completedBookings || 0 },
+    { id: 'earnings', label: 'Earnings', value: formatCurrency(stats.totalEarnings) },
+  ]
+
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Provider</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-900">{profile?.businessName || user?.name}</h1>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider</p>
+        <h1 className="mt-2 text-3xl font-black text-slate-900">Service Provider Dashboard</h1>
         <p className="mt-1 text-slate-500">Manage services, booking requests, earnings, and reviews.</p>
+        {displayName && (
+          <p className="mt-3 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+            {displayName}
+          </p>
+        )}
       </div>
 
       <Alert>{error}</Alert>
 
-      <div className="grid gap-4 md:grid-cols-5">
-        <StatCard label="Services" value={stats.totalServices || 0} />
-        <StatCard label="Active" value={stats.activeServices || 0} />
-        <StatCard label="Pending" value={stats.pendingBookings || 0} />
-        <StatCard label="Completed" value={stats.completedBookings || 0} />
-        <StatCard label="Earnings" value={formatCurrency(stats.totalEarnings)} />
-      </div>
+      <DraggableGrid
+        items={statCards}
+        storageKey="localfixr-provider-dashboard-card-order"
+        className="grid gap-4 md:grid-cols-5"
+        renderItem={(card) => <StatCard label={card.label} value={card.value} />}
+      />
 
       <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
         {[
@@ -310,43 +376,56 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
 
       {activeTab === 'services' && (
         <section className="grid gap-6 lg:grid-cols-[400px_1fr]">
-          <form onSubmit={handleServiceSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <form onSubmit={serviceFormik.handleSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-black text-slate-900">{editingId ? 'Edit Service' : 'Add Service'}</h2>
             {[
               ['title', 'Title'],
               ['price', 'Price'],
               ['location', 'Location'],
             ].map(([name, label]) => (
-              <FormField
-                key={name}
-                label={label}
-                className="mt-4"
-                required={name !== 'location'}
-                type={name === 'price' ? 'number' : 'text'}
-                value={serviceForm[name]}
-                onChange={(event) => setServiceForm((current) => ({ ...current, [name]: event.target.value }))}
-              />
+              <div key={name}>
+                <FormField
+                  name={name}
+                  label={<>{label}{name !== 'location' && <span className="text-rose-500"> *</span>}</>}
+                  className="mt-4"
+                  type={name === 'price' ? 'number' : 'text'}
+                  value={serviceFormik.values[name]}
+                  onChange={serviceFormik.handleChange}
+                  onBlur={serviceFormik.handleBlur}
+                />
+                {serviceFormik.touched[name] && serviceFormik.errors[name] && (
+                  <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors[name]}</span>
+                )}
+              </div>
             ))}
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Category
+              Category <span className="text-rose-500">*</span>
               <select
-                required
-                value={serviceForm.category}
-                onChange={(event) => setServiceForm((current) => ({ ...current, category: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                name="category"
+                value={serviceFormik.values.category}
+                onChange={serviceFormik.handleChange}
+                onBlur={serviceFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  serviceFormik.touched.category && serviceFormik.errors.category ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               >
                 <option value="">Select a category</option>
                 {SERVICE_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
+              {serviceFormik.touched.category && serviceFormik.errors.category && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.category}</span>
+              )}
             </label>
             
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Status
               <select
-                value={serviceForm.status}
-                onChange={(event) => setServiceForm((current) => ({ ...current, status: event.target.value }))}
+                name="status"
+                value={serviceFormik.values.status}
+                onChange={serviceFormik.handleChange}
+                onBlur={serviceFormik.handleBlur}
                 className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
               >
                 <option value="active">Active</option>
@@ -354,14 +433,20 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
               </select>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Description
+              Description <span className="text-rose-500">*</span>
               <textarea
-                required
+                name="description"
                 rows="4"
-                value={serviceForm.description}
-                onChange={(event) => setServiceForm((current) => ({ ...current, description: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                value={serviceFormik.values.description}
+                onChange={serviceFormik.handleChange}
+                onBlur={serviceFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  serviceFormik.touched.description && serviceFormik.errors.description ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               />
+              {serviceFormik.touched.description && serviceFormik.errors.description && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.description}</span>
+              )}
             </label>
             <div className="mt-5 flex gap-3">
               <Button type="submit" disabled={saving}>
@@ -440,54 +525,81 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       )}
 
       {activeTab === 'profile' && (
-        <form onSubmit={handleProfile} className="max-w-3xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-slate-900">Provider Profile</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <FormField
-              label="Business name"
-              value={profileForm.businessName}
-              onChange={(event) => setProfileForm((current) => ({ ...current, businessName: event.target.value }))}
-            />
-            <div className="flex items-center gap-3">
+        <div className="max-w-3xl space-y-6">
+          <form onSubmit={profileFormik.handleSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-black text-slate-900">Provider Profile</h2>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <FormField
-                label="Available for new bookings"
-                type="checkbox"
-                checked={profileForm.available}
-                onChange={(event) => setProfileForm((current) => ({ ...current, available: event.target.checked }))}
+                name="businessName"
+                label={<>Business name <span className="text-rose-500">*</span></>}
+                value={profileFormik.values.businessName}
+                onChange={profileFormik.handleChange}
+                onBlur={profileFormik.handleBlur}
               />
+              <div className="flex items-center gap-3">
+                <FormField
+                  label="Available for new bookings"
+                  type="checkbox"
+                  name="available"
+                  checked={profileFormik.values.available}
+                  onChange={profileFormik.handleChange}
+                />
+              </div>
             </div>
-          </div>
-          <label className="mt-5 block text-sm font-semibold text-slate-700">
-            Bio
-            <textarea
-              rows="4"
-              value={profileForm.bio}
-              onChange={(event) => setProfileForm((current) => ({ ...current, bio: event.target.value }))}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
-              placeholder="Describe your business and services..."
+            {profileFormik.touched.businessName && profileFormik.errors.businessName && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.businessName}</span>
+            )}
+            <label className="mt-5 block text-sm font-semibold text-slate-700">
+              Bio
+              <textarea
+                name="bio"
+                rows="4"
+                value={profileFormik.values.bio}
+                onChange={profileFormik.handleChange}
+                onBlur={profileFormik.handleBlur}
+                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                placeholder="Describe your business and services..."
+              />
+              {profileFormik.touched.bio && profileFormik.errors.bio && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.bio}</span>
+              )}
+            </label>
+            <label className="mt-5 block text-sm font-semibold text-slate-700">
+              Service work <span className="text-rose-500">*</span>
+              <select
+                name="skills"
+                value={profileFormik.values.skills}
+                onChange={profileFormik.handleChange}
+                onBlur={profileFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none transition focus:border-indigo-400 ${
+                  profileFormik.touched.skills && profileFormik.errors.skills ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
+              >
+                <option value="">Select your work type</option>
+                {SERVICE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              {profileFormik.touched.skills && profileFormik.errors.skills && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.skills}</span>
+              )}
+            </label>
+            <FormField
+              name="serviceAreas"
+              label={<>Service areas (comma separated) <span className="text-rose-500">*</span></>}
+              value={profileFormik.values.serviceAreas}
+              onChange={profileFormik.handleChange}
+              onBlur={profileFormik.handleBlur}
+              placeholder="e.g., Downtown, Suburbs, North Side"
             />
-          </label>
-          <label className="mt-5 block text-sm font-semibold text-slate-700">
-            Service work
-            <select
-              value={profileForm.skills}
-              onChange={(event) => setProfileForm((current) => ({ ...current, skills: event.target.value }))}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-400"
-            >
-              <option value="">Select your work type</option>
-              {SERVICE_CATEGORIES.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </label>
-          <FormField
-            label="Service areas (comma separated)"
-            value={profileForm.serviceAreas}
-            onChange={(event) => setProfileForm((current) => ({ ...current, serviceAreas: event.target.value }))}
-            placeholder="e.g., Downtown, Suburbs, North Side"
-          />
-          <Button type="submit" disabled={saving} className="mt-5">Save profile</Button>
-        </form>
+            {profileFormik.touched.serviceAreas && profileFormik.errors.serviceAreas && (
+              <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.serviceAreas}</span>
+            )}
+            <Button type="submit" disabled={saving} className="mt-5">Save profile</Button>
+          </form>
+
+          <DeleteAccountPanel userRole="service_provider" onError={setError} />
+        </div>
       )}
 
       <ConfirmModal

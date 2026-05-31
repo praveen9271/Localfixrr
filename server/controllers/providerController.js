@@ -1,4 +1,4 @@
-import Service from '../models/Service.js';
+import Service, { normalizeServiceText } from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import Provider from '../models/Provider.js';
@@ -29,6 +29,17 @@ const populateProviderBooking = [
   { path: 'customer', select: 'name email phone address' },
 ];
 
+const getDuplicateServiceQuery = ({ providerId, title, category, excludeId = null }) => {
+  const query = {
+    provider: providerId,
+    normalizedTitle: normalizeServiceText(title),
+    category,
+  };
+
+  if (excludeId) query._id = { $ne: excludeId };
+  return query;
+};
+
 // @desc    Create a new service
 // @route   POST /api/provider/services
 // @access  Service Provider
@@ -55,6 +66,18 @@ const createService = async (req, res) => {
     }
 
     const provider = req.provider || await ensureProviderProfile(req.user);
+    const duplicateService = await Service.exists(getDuplicateServiceQuery({
+      providerId: provider._id,
+      title,
+      category: normalizedCategory,
+    }));
+
+    if (duplicateService) {
+      return res.status(409).json({
+        success: false,
+        message: 'You already have this service listed in the same category',
+      });
+    }
 
     const service = await Service.create({
       title: title.trim(),
@@ -74,7 +97,7 @@ const createService = async (req, res) => {
   } catch (error) {
     console.error('Create service error:', error);
     if (error.code === 11000) {
-      return res.status(400).json({ success: false, message: 'A service with this title already exists' });
+      return res.status(409).json({ success: false, message: 'You already have this service listed in the same category' });
     }
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -131,6 +154,8 @@ const updateService = async (req, res) => {
     }
 
     const { title, description, category, price, location, image, status } = req.body;
+    const nextTitle = title !== undefined ? title : service.title;
+    let nextCategory = service.category;
 
     if (title !== undefined) service.title = title;
     if (description !== undefined) service.description = description;
@@ -139,8 +164,24 @@ const updateService = async (req, res) => {
       if (!normalizedCategory) {
         return res.status(400).json({ success: false, message: 'Please select a valid LocalFixr service category' });
       }
+      nextCategory = normalizedCategory;
       service.category = normalizedCategory;
     }
+
+    const duplicateService = await Service.exists(getDuplicateServiceQuery({
+      providerId: provider._id,
+      title: nextTitle,
+      category: nextCategory,
+      excludeId: service._id,
+    }));
+
+    if (duplicateService) {
+      return res.status(409).json({
+        success: false,
+        message: 'You already have this service listed in the same category',
+      });
+    }
+
     if (price !== undefined) service.price = price;
     if (location !== undefined) service.location = location;
     if (image !== undefined) service.image = image;
@@ -155,6 +196,9 @@ const updateService = async (req, res) => {
     });
   } catch (error) {
     console.error('Update service error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'You already have this service listed in the same category' });
+    }
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

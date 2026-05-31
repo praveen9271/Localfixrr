@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
+import { useFormik } from 'formik'
 import { ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import * as Yup from 'yup'
 import OTPInput from '../components/OTPInput'
 import Button from '../components/ui/Button'
 import Toast from '../components/ui/Toast'
@@ -13,12 +15,17 @@ const getSecondsLeft = (expiresAt) => {
   return Math.max(0, Math.ceil((expiry - Date.now()) / 1000))
 }
 
+const otpSchema = Yup.object({
+  otp: Yup.string()
+    .matches(/^\d{6}$/, 'Enter the 6-digit OTP.')
+    .required('OTP is required.'),
+})
+
 function VerifyOTP() {
   const navigate = useNavigate()
   const location = useLocation()
   const email = location.state?.email || sessionStorage.getItem('resetEmail') || ''
   const [expiresAt, setExpiresAt] = useState(location.state?.expiresAt || sessionStorage.getItem('resetExpiresAt') || '')
-  const [otp, setOtp] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(getSecondsLeft(expiresAt))
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState('')
@@ -36,6 +43,25 @@ function VerifyOTP() {
     setTimeout(() => setToast(''), 3000)
   }
 
+  const formik = useFormik({
+    initialValues: { otp: '' },
+    validationSchema: otpSchema,
+    validateOnMount: true,
+    onSubmit: async (values) => {
+      setLoading(true)
+      try {
+        const response = await verifyResetOtp({ email, otp: values.otp })
+        sessionStorage.setItem('resetToken', response.resetToken)
+        showToast(response.message)
+        navigate('/reset-password', { state: { resetToken: response.resetToken } })
+      } catch (error) {
+        showToast(error.response?.data?.message || 'OTP verification failed', 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+  })
+
   useEffect(() => {
     if (!email) {
       navigate('/forgot-password', { replace: true })
@@ -45,28 +71,13 @@ function VerifyOTP() {
     return () => clearInterval(timer)
   }, [email, expiresAt, navigate])
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    try {
-      const response = await verifyResetOtp({ email, otp })
-      sessionStorage.setItem('resetToken', response.resetToken)
-      showToast(response.message)
-      navigate('/reset-password', { state: { resetToken: response.resetToken } })
-    } catch (error) {
-      showToast(error.response?.data?.message || 'OTP verification failed', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleResend = async () => {
     setLoading(true)
     try {
       const response = await forgotPassword({ email })
       setExpiresAt(response.expiresAt || '')
       sessionStorage.setItem('resetExpiresAt', response.expiresAt || '')
-      setOtp('')
+      formik.resetForm()
       showToast('New OTP sent to your email')
     } catch (error) {
       showToast(error.response?.data?.message || 'Unable to resend OTP', 'error')
@@ -80,7 +91,7 @@ function VerifyOTP() {
       <motion.form
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        onSubmit={handleSubmit}
+        onSubmit={formik.handleSubmit}
         className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_30px_80px_rgba(15,23,42,0.14)]"
       >
         <div className="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
@@ -91,7 +102,20 @@ function VerifyOTP() {
         <p className="mt-3 text-sm leading-6 text-slate-500">Enter the 6-digit code sent to <span className="font-bold text-slate-700">{email}</span>.</p>
 
         <div className="mt-6">
-          <OTPInput value={otp} onChange={setOtp} disabled={loading} />
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            OTP <span className="text-rose-500">*</span>
+          </label>
+          <OTPInput
+            value={formik.values.otp}
+            onChange={(value) => {
+              formik.setFieldTouched('otp', true, false)
+              formik.setFieldValue('otp', value)
+            }}
+            disabled={loading}
+          />
+          {formik.touched.otp && formik.errors.otp && (
+            <span className="mt-2 block text-xs font-semibold text-rose-600">{formik.errors.otp}</span>
+          )}
         </div>
 
         <div className="mt-4 flex items-center justify-between text-sm">
@@ -101,7 +125,7 @@ function VerifyOTP() {
           </button>
         </div>
 
-        <Button type="submit" disabled={loading || otp.length !== 6} className="mt-6 w-full justify-center rounded-2xl py-4">
+        <Button type="submit" disabled={loading || !formik.isValid} className="mt-6 w-full justify-center rounded-2xl py-4">
           {loading ? 'Verifying...' : 'Verify OTP'}
         </Button>
 

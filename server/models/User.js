@@ -16,19 +16,50 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Please provide a phone number'],
-    match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number']
+    required: [
+      function requiredPhone() {
+        return this.authProvider === 'local';
+      },
+      'Please provide a phone number',
+    ],
+    validate: {
+      validator(value) {
+        return !value || /^[0-9]{10}$/.test(value);
+      },
+      message: 'Please provide a valid 10-digit phone number',
+    },
   },
   address: {
     type: String,
-    required: [true, 'Please provide an address'],
+    required: [
+      function requiredAddress() {
+        return this.authProvider === 'local';
+      },
+      'Please provide an address',
+    ],
     trim: true
   },
   password: {
     type: String,
-    required: [true, 'Please provide a password'],
+    required: [
+      function requiredPassword() {
+        return this.authProvider === 'local';
+      },
+      'Please provide a password',
+    ],
     minlength: [6, 'Password must be at least 6 characters'],
     select: false
+  },
+  googleId: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true,
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'local_google'],
+    default: 'local',
   },
   resetOTP: {
     type: String,
@@ -97,6 +128,14 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $type: 'string', $ne: '' } },
+  },
+);
+
 // Hash password before saving
 userSchema.pre('save', async function() {
   if (!this.isModified('password')) {
@@ -111,6 +150,7 @@ userSchema.pre('save', async function() {
 
 // Method to compare password
 userSchema.methods.matchPassword = async function(enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

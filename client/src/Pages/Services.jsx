@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useFormik } from 'formik'
+import { useNavigate, useSearchParams } from 'react-router'
+import * as Yup from 'yup'
 import { createBooking, getPublicServices } from '../services/dashboardService'
 import { getCurrentUser, isAuthenticated, isUser } from '../services/authService'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
-import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
-import { formatCurrency } from '../utils/formatters'
+import ServiceListingCard from '../components/services/ServiceListingCard'
 import { SERVICE_AREA_FULL, isSupportedLocation, unsupportedLocationMessage } from '../utils/serviceArea'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 
@@ -45,6 +46,12 @@ const normalizeCategory = (value) => {
 const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
 
+const bookingSchema = Yup.object({
+  date: Yup.string().required('Preferred date and time is required.'),
+  address: Yup.string().trim().min(5, 'Enter a complete service address.').required('Address is required.'),
+  notes: Yup.string().max(500, 'Notes must be 500 characters or less.'),
+})
+
 function ServiceSkeleton() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -56,13 +63,13 @@ function ServiceSkeleton() {
 }
 
 function Services() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [bookingService, setBookingService] = useState(null)
-  const [bookingForm, setBookingForm] = useState({ date: '', address: getCurrentUser()?.address || '', notes: '' })
   const [visiblePhoneIds, setVisiblePhoneIds] = useState([])
   const [saving, setSaving] = useState(false)
 
@@ -119,33 +126,36 @@ function Services() {
     setSearchParams(nextParams)
   }
 
-  const handleBooking = async (event) => {
-    event.preventDefault()
-    if (!isAuthenticated()) {
-      showToast('Please log in as a customer to book a service')
-      return
-    }
-    if (!isUser()) {
-      showToast('Only customer accounts can book services')
-      return
-    }
-    setSaving(true)
-    try {
-      await createBooking({
-        serviceId: bookingService._id,
-        date: bookingForm.date,
-        address: bookingForm.address,
-        notes: bookingForm.notes,
-      })
-      setBookingService(null)
-      setBookingForm({ date: '', address: getCurrentUser()?.address || '', notes: '' })
-      showToast('Booking request sent')
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Booking failed')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const bookingFormik = useFormik({
+    initialValues: { date: '', address: getCurrentUser()?.address || '', notes: '' },
+    validationSchema: bookingSchema,
+    onSubmit: async (values, { resetForm }) => {
+      if (!isAuthenticated()) {
+        showToast('Please log in as a customer to book a service')
+        return
+      }
+      if (!isUser()) {
+        showToast('Only customer accounts can book services')
+        return
+      }
+      setSaving(true)
+      try {
+        await createBooking({
+          serviceId: bookingService._id,
+          date: values.date,
+          address: values.address,
+          notes: values.notes,
+        })
+        setBookingService(null)
+        resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+        showToast('Booking request sent')
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Booking failed')
+      } finally {
+        setSaving(false)
+      }
+    },
+  })
 
   const togglePhone = (serviceId) => {
     setVisiblePhoneIds((current) =>
@@ -153,6 +163,32 @@ function Services() {
         ? current.filter((id) => id !== serviceId)
         : [...current, serviceId],
     )
+  }
+
+  const handleMenuAction = async (action, service) => {
+    if (action === 'share') {
+      const shareUrl = `${window.location.origin}/provider/${service._id}`
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: service.title, url: shareUrl })
+        } else if (navigator.clipboard) {
+          await navigator.clipboard.writeText(shareUrl)
+          showToast('Service link copied')
+        }
+      } catch {
+        showToast('Share cancelled')
+      }
+      return
+    }
+
+    if (action === 'save') {
+      showToast('Service saved for later')
+      return
+    }
+
+    if (action === 'report') {
+      showToast('Report received. Our team will review this service.')
+    }
   }
 
   return (
@@ -233,77 +269,22 @@ function Services() {
         {loading
           ? Array.from({ length: 6 }).map((_, index) => <ServiceSkeleton key={index} />)
           : filteredServices.map((service) => (
-            <article key={service._id} className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_22px_55px_rgba(79,70,229,0.14)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">{service.title}</h2>
-                  <p className="mt-1 text-sm font-semibold text-indigo-600">{normalizeCategory(service.category) || service.category}</p>
-                </div>
-                <StatusBadge status={service.provider?.available ? 'active' : 'inactive'} />
-              </div>
-              <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{service.description}</p>
-              <div className="mt-5 rounded-xl bg-gradient-to-br from-indigo-50 to-sky-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-500">Service Provider</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-sm font-black text-indigo-600 shadow-sm">
-                    {(service.provider?.businessName || service.provider?.user?.name || 'P').charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-black text-slate-900">
-                      {service.provider?.businessName || service.provider?.user?.name || 'Provider'}
-                    </p>
-                    <p className="truncate text-sm text-slate-500">
-                      {service.provider?.user?.name || 'Verified LocalFixr professional'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Price</p>
-                  <p className="font-black text-slate-900">{formatCurrency(service.price)}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Rating</p>
-                  <p className="font-black text-slate-900">{service.rating || 0}/5</p>
-                </div>
-              </div>
-              <p className="mt-1 text-sm text-slate-500">{service.location || service.provider?.user?.address}</p>
-              {visiblePhoneIds.includes(service._id) && (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Provider phone</p>
-                  {getProviderPhone(service) ? (
-                    <a href={`tel:${getProviderPhone(service)}`} className="mt-1 block text-lg font-black text-emerald-800">
-                      {getProviderPhone(service)}
-                    </a>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-emerald-800">Phone number not available</p>
-                  )}
-                </div>
-              )}
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!getProviderPhone(service)) {
-                      showToast('Provider phone number is not available yet')
-                    }
-                    togglePhone(service._id)
-                  }}
-                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
-                >
-                  {visiblePhoneIds.includes(service._id) ? 'Hide number' : 'Call'}
-                </button>
-                <Link to={`/provider/${service._id}`} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50">
-                  Details
-                </Link>
-                <Button
-                  onClick={() => setBookingService(service)}
-                >
-                  Book now
-                </Button>
-              </div>
-            </article>
+            <ServiceListingCard
+              key={service._id}
+              service={{ ...service, category: normalizeCategory(service.category) || service.category }}
+              contactVisible={visiblePhoneIds.includes(service._id)}
+              phone={getProviderPhone(service)}
+              onBook={() => {
+                bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                setBookingService(service)
+              }}
+              onDetails={() => navigate(`/provider/${service._id}`)}
+              onContact={() => {
+                if (!getProviderPhone(service)) showToast('Provider phone number is not available yet')
+                togglePhone(service._id)
+              }}
+              onMenuAction={handleMenuAction}
+            />
           ))}
       </div>
 
@@ -317,35 +298,52 @@ function Services() {
       )}
 
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
-          <form onSubmit={handleBooking}>
+          <form onSubmit={bookingFormik.handleSubmit}>
             <label className="mt-5 block text-sm font-semibold text-slate-700">
-              Preferred date and time
+              Preferred date and time <span className="text-rose-500">*</span>
               <input
+                name="date"
                 type="datetime-local"
-                required
-                value={bookingForm.date}
-                onChange={(event) => setBookingForm((current) => ({ ...current, date: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                value={bookingFormik.values.date}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  bookingFormik.touched.date && bookingFormik.errors.date ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               />
+              {bookingFormik.touched.date && bookingFormik.errors.date && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.date}</span>
+              )}
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Address
+              Address <span className="text-rose-500">*</span>
               <textarea
-                required
+                name="address"
                 rows="2"
-                value={bookingForm.address}
-                onChange={(event) => setBookingForm((current) => ({ ...current, address: event.target.value }))}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                value={bookingFormik.values.address}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
+                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                  bookingFormik.touched.address && bookingFormik.errors.address ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                }`}
               />
+              {bookingFormik.touched.address && bookingFormik.errors.address && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.address}</span>
+              )}
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Notes
               <textarea
+                name="notes"
                 rows="3"
-                value={bookingForm.notes}
-                onChange={(event) => setBookingForm((current) => ({ ...current, notes: event.target.value }))}
+                value={bookingFormik.values.notes}
+                onChange={bookingFormik.handleChange}
+                onBlur={bookingFormik.handleBlur}
                 className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
               />
+              {bookingFormik.touched.notes && bookingFormik.errors.notes && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.notes}</span>
+              )}
             </label>
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>

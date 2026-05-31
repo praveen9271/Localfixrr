@@ -12,7 +12,7 @@ function ServiceCard({ icon, title, description, accent, iconColor = 'text-indig
           onClick?.()
         }
       }}
-      className={`group flex min-h-[320px] flex-col justify-center rounded-[1.75rem] border border-slate-200 bg-white px-7 py-8 shadow-[0_22px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-2 hover:scale-105 hover:border-indigo-100 hover:shadow-[0_30px_70px_rgba(79,70,229,0.16)] active:translate-y-1 active:scale-[0.99] ${
+      className={`group flex min-h-[320px] cursor-pointer flex-col rounded-xl border border-slate-200 bg-white px-7 py-8 shadow-[0_22px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:border-indigo-100 hover:shadow-[0_30px_70px_rgba(79,70,229,0.16)] active:translate-y-1 active:scale-[0.99] ${
         centered ? 'text-center' : 'text-left'
       }`}
     >
@@ -27,6 +27,12 @@ function ServiceCard({ icon, title, description, accent, iconColor = 'text-indig
       {description && (
         <p className="mt-4 text-sm leading-7 text-slate-600">{description}</p>
       )}
+      <div className="mt-auto pt-6">
+        <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 text-sm font-bold text-indigo-700 transition group-hover:bg-indigo-50">
+          View Details
+          <Icon name="arrowRight" className="h-4 w-4" />
+        </span>
+      </div>
     </article>
   )
 }

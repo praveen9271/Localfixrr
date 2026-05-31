@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Provider from '../models/Provider.js';
 import Service from '../models/Service.js';
+import { normalizeServiceCategory } from '../config/serviceCategories.js';
 
 dotenv.config({ quiet: true });
 
@@ -87,6 +88,7 @@ const connectDB = async () => {
 };
 
 const seedProvider = async (providerData) => {
+  const normalizedCategory = normalizeServiceCategory(providerData.category) || providerData.category;
   let user = await User.findOne({ email: providerData.email });
 
   if (!user) {
@@ -117,7 +119,7 @@ const seedProvider = async (providerData) => {
       user: user._id,
       businessName: providerData.businessName,
       bio: providerData.description,
-      skills: providerData.skills,
+      skills: providerData.skills.map((skill) => normalizeServiceCategory(skill) || skill),
       serviceAreas: [defaultAddress],
       available: true,
       isVerified: true,
@@ -125,7 +127,7 @@ const seedProvider = async (providerData) => {
   } else {
     provider.businessName = providerData.businessName;
     provider.bio = providerData.description;
-    provider.skills = providerData.skills;
+    provider.skills = providerData.skills.map((skill) => normalizeServiceCategory(skill) || skill);
     provider.serviceAreas = provider.serviceAreas?.length ? provider.serviceAreas : [defaultAddress];
     provider.available = true;
     provider.isVerified = true;
@@ -137,7 +139,7 @@ const seedProvider = async (providerData) => {
 
   const existingService = await Service.findOne({
     provider: provider._id,
-    category: providerData.category,
+    category: normalizedCategory,
     title: providerData.title,
   });
 
@@ -145,7 +147,7 @@ const seedProvider = async (providerData) => {
     await Service.create({
       title: providerData.title,
       description: providerData.description,
-      category: providerData.category,
+      category: normalizedCategory,
       price: providerData.price,
       provider: provider._id,
       status: 'active',
@@ -153,6 +155,7 @@ const seedProvider = async (providerData) => {
     });
   } else {
     existingService.description = providerData.description;
+    existingService.category = normalizedCategory;
     existingService.price = providerData.price;
     existingService.status = 'active';
     existingService.location = existingService.location || defaultAddress;

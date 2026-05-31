@@ -4,11 +4,10 @@ import { scrollToSection } from "../utils/scroll";
 import Icon from "./Icon";
 import logo from "../assets/logo.png";
 import { isAuthenticated, getUserRole, logout } from "../services/authService";
-import { button3d, button3dSubtle } from "../utils/tailwindStyles";
 
 const navLinks = [
   { label: "Home", icon: "home", to: "/" },
-  { label: "Services", icon: "wrench", to: "/services" },
+  { label: "Services", icon: "wrench", to: "/#services" },
   { label: "How It Works", icon: "spark", to: "/#how-it-works" },
   { label: "Contact", icon: "phone", to: "/#contact" },
 ];
@@ -20,10 +19,10 @@ function ThemeIconButton({ darkMode, onToggleDarkMode }) {
       onClick={onToggleDarkMode}
       aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={darkMode}
-      className={`grid h-11 w-11 place-items-center rounded-full border shadow-[0_14px_28px_rgba(79,70,229,0.18),inset_0_1px_0_rgba(255,255,255,0.8)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(79,70,229,0.24)] active:translate-y-1 ${
+      className={`grid h-10 w-10 cursor-pointer place-items-center rounded-full border transition duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
         darkMode
-          ? "border-slate-700 bg-slate-900 text-white"
-          : "border-indigo-100 bg-white text-indigo-600"
+          ? "border-white/15 bg-white/8 text-slate-100 hover:bg-white/12"
+          : "border-slate-200 bg-white text-indigo-600 shadow-sm hover:border-indigo-200 hover:bg-indigo-50"
       }`}
     >
       <Icon name={darkMode ? "moon" : "sun"} className="h-5 w-5" />
@@ -62,6 +61,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
   const isActive = (to) => {
     const [path, hash] = to.split("#");
     if (hash) return location.pathname === path && location.hash === `#${hash}`;
+    if (to === "/" && location.hash) return false;
     return location.pathname === path;
   };
 
@@ -70,30 +70,30 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
       data-app-header
       className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
         darkMode
-          ? "border-white/10 bg-slate-950/90"
-          : "border-white/60 bg-white/90"
+          ? "border-white/10 bg-slate-950/92"
+          : "border-slate-200/70 bg-white/92 shadow-sm"
       }`}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
+        <button type="button" onClick={() => handleAnchorRoute('/')} className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-lg pr-2">
           <img
             src={logo}
             alt="LocalFixr logo"
-            className="h-13 w-13 object-contain"
+            className="h-9 w-9 shrink-0 object-contain"
           />
-          <div>
+          <div className="flex items-baseline leading-none">
             <span
-              className={`text-2xl font-black tracking-tight ${
+              className={`text-xl font-black tracking-tight ${
                 darkMode ? "text-white" : "text-slate-900"
               }`}
             >
               Local
             </span>
-            <span className="text-2xl font-black tracking-tight text-indigo-500">
+            <span className="text-xl font-black tracking-tight text-indigo-500">
               Fixr
             </span>
           </div>
-        </div>
+        </button>
 
         <nav className="hidden items-center gap-8 lg:flex">
           {navLinks.map((link) => (
@@ -101,18 +101,21 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               key={link.label}
               type="button"
               onClick={() => handleAnchorRoute(link.to)}
-              className={`${button3dSubtle} flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold hover:text-indigo-500 ${
+              className={`relative inline-flex h-10 cursor-pointer items-center gap-2 text-sm font-bold transition duration-200 ${
                 isActive(link.to)
                   ? darkMode
-                    ? "bg-white/10 text-indigo-300"
-                    : "bg-indigo-50 text-indigo-600"
+                    ? "text-indigo-200"
+                    : "text-indigo-700"
                   : darkMode
-                    ? "text-slate-200"
-                    : "text-slate-700"
+                    ? "text-slate-300 hover:text-white"
+                    : "text-slate-600 hover:text-slate-950"
               }`}
             >
               <Icon name={link.icon} className="h-4 w-4 text-indigo-500" />
               {link.label}
+              {isActive(link.to) && (
+                <span className="absolute -bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-indigo-500" />
+              )}
             </button>
           ))}
         </nav>
@@ -123,10 +126,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               <button
                 type="button"
                 onClick={handleDashboard}
-                className={`${button3dSubtle} rounded-xl border px-5 py-2.5 text-sm font-semibold ${
+                className={`inline-flex h-10 cursor-pointer items-center justify-center px-2 text-sm font-bold transition duration-200 ${
                   darkMode
-                    ? "border-white/15 bg-white/5 text-indigo-200 hover:bg-white/10"
-                    : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                    ? "text-indigo-200 hover:text-white"
+                    : "text-indigo-700 hover:text-indigo-900"
                 }`}
               >
                 Dashboard
@@ -134,7 +137,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className={`${button3d} rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/25`}
+                className="inline-flex h-10 cursor-pointer items-center justify-center px-2 text-sm font-bold text-red-600 transition duration-200 hover:text-red-700"
               >
                 Logout
               </button>
@@ -144,10 +147,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               <button
                 type="button"
                 onClick={onLoginClick}
-                className={`${button3dSubtle} rounded-xl border px-5 py-2.5 text-sm font-semibold ${
+                className={`inline-flex h-10 cursor-pointer items-center justify-center px-2 text-sm font-bold transition duration-200 ${
                   darkMode
-                    ? "border-white/15 bg-white/5 text-indigo-200 hover:bg-white/10"
-                    : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                    ? "text-indigo-200 hover:text-white"
+                    : "text-indigo-700 hover:text-indigo-900"
                 }`}
               >
                 Login
@@ -155,7 +158,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               <button
                 type="button"
                 onClick={onRegisterClick}
-                className={`${button3d} rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25`}
+                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-bold text-white transition duration-200 hover:bg-indigo-700"
               >
                 Register
               </button>
@@ -170,10 +173,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
         <button
           type="button"
           onClick={() => setIsMenuOpen((current) => !current)}
-          className={`${button3dSubtle} flex h-11 w-11 items-center justify-center rounded-2xl border lg:hidden ${
+          className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition duration-200 lg:hidden ${
             darkMode
-              ? "border-white/15 bg-white/5 text-white"
-              : "border-slate-200 text-slate-700"
+              ? "border-white/15 bg-white/8 text-white hover:bg-white/12"
+              : "border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-indigo-50 hover:text-indigo-700"
           }`}
         >
           <Icon name={isMenuOpen ? "close" : "menu"} className="h-5 w-5" />
@@ -182,7 +185,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
 
       {isMenuOpen && (
         <div
-          className={`border-t px-4 py-4 lg:hidden ${
+          className={`border-t px-4 py-4 shadow-lg lg:hidden ${
             darkMode
               ? "border-white/10 bg-slate-950"
               : "border-slate-100 bg-white"
@@ -194,18 +197,21 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                 key={link.label}
                 type="button"
                 onClick={() => handleAnchorRoute(link.to)}
-                className={`${button3dSubtle} flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold hover:bg-slate-50 hover:text-indigo-500 ${
+                className={`relative flex h-11 cursor-pointer items-center gap-3 px-1 text-sm font-bold transition duration-200 ${
                   isActive(link.to)
                     ? darkMode
-                      ? "bg-white/10 text-indigo-300"
-                      : "bg-indigo-50 text-indigo-600"
+                      ? "text-indigo-200"
+                      : "text-indigo-700"
                     : darkMode
-                      ? "text-slate-200"
-                      : "text-slate-700"
+                      ? "text-slate-200 hover:text-white"
+                      : "text-slate-700 hover:text-slate-950"
                 }`}
               >
                 <Icon name={link.icon} className="h-4 w-4 text-indigo-500" />
                 {link.label}
+                {isActive(link.to) && (
+                  <span className="absolute bottom-1 left-1 h-0.5 w-6 rounded-full bg-indigo-500" />
+                )}
               </button>
             ))}
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -217,10 +223,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       handleDashboard();
                     }}
-                    className={`${button3dSubtle} rounded-2xl border px-5 py-3 font-semibold ${
+                    className={`h-11 cursor-pointer px-1 text-left text-sm font-bold transition duration-200 ${
                       darkMode
-                        ? "border-white/15 bg-white/5 text-indigo-200"
-                        : "border-indigo-200 text-indigo-600"
+                        ? "text-indigo-200 hover:text-white"
+                        : "text-indigo-700 hover:text-indigo-900"
                     }`}
                   >
                     Dashboard
@@ -231,7 +237,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       handleLogout();
                     }}
-                    className={`${button3d} rounded-2xl bg-gradient-to-r from-red-500 to-red-600 px-5 py-3 font-semibold text-white`}
+                    className="h-11 cursor-pointer px-1 text-left text-sm font-bold text-red-600 transition duration-200 hover:text-red-700"
                   >
                     Logout
                   </button>
@@ -244,10 +250,10 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       onLoginClick();
                     }}
-                    className={`${button3dSubtle} rounded-2xl border px-5 py-3 font-semibold ${
+                    className={`h-11 cursor-pointer px-1 text-left text-sm font-bold transition duration-200 ${
                       darkMode
-                        ? "border-white/15 bg-white/5 text-indigo-200"
-                        : "border-indigo-200 text-indigo-600"
+                        ? "text-indigo-200 hover:text-white"
+                        : "text-indigo-700 hover:text-indigo-900"
                     }`}
                   >
                     Login
@@ -258,7 +264,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       setIsMenuOpen(false);
                       onRegisterClick();
                     }}
-                    className={`${button3d} rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-3 font-semibold text-white`}
+                    className="h-11 cursor-pointer rounded-lg bg-indigo-600 px-5 text-sm font-bold text-white transition duration-200 hover:bg-indigo-700"
                   >
                     Register
                   </button>

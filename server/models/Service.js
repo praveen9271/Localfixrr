@@ -1,5 +1,13 @@
 import mongoose from 'mongoose';
 
+const normalizeServiceText = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const serviceSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -25,6 +33,11 @@ const serviceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Provider',
     required: true
+  },
+  normalizedTitle: {
+    type: String,
+    trim: true,
+    default: '',
   },
   status: {
     type: String,
@@ -64,8 +77,20 @@ const serviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
+serviceSchema.pre('validate', function normalizeServiceIdentity() {
+  this.normalizedTitle = normalizeServiceText(this.title);
+});
+
 // Index for search
 serviceSchema.index({ title: 'text', description: 'text', category: 'text' });
 serviceSchema.index({ provider: 1, status: 1 });
+serviceSchema.index(
+  { provider: 1, normalizedTitle: 1, category: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { normalizedTitle: { $type: 'string', $ne: '' } },
+  },
+);
 
 export default mongoose.model('Service', serviceSchema);
+export { normalizeServiceText };
