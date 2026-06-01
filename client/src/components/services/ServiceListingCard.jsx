@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
-  Bookmark,
   Brush,
   ExternalLink,
   Flag,
@@ -128,7 +127,6 @@ function ServiceListingCard({
                 )}
                 {[
                   ['share', Share2, 'Share'],
-                  ['save', Bookmark, 'Save'],
                   ['report', Flag, 'Report'],
                   ['contact', MessageCircle, 'Contact Provider'],
                 ].map(([action, Icon, label]) => (

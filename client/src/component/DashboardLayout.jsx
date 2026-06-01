@@ -34,6 +34,7 @@ const roleNavItems = {
 
 const toTitleCase = (value) =>
   String(value || '')
+    .replace(/_/g, ' ')
     .trim()
     .split(/\s+/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -47,6 +48,7 @@ const DashboardLayout = ({ children }) => {
   const user = getCurrentUser()
   const role = getUserRole()
   const displayName = toTitleCase(user?.name) || 'User'
+  const roleLabel = role === 'service_provider' ? 'Provider' : toTitleCase(role)
 
   const navItems = [
     { path: '/', label: 'Home', icon: 'home', exact: true },
@@ -104,8 +106,8 @@ const DashboardLayout = ({ children }) => {
         <div className="shrink-0 border-b border-slate-700 px-6 py-4">
           <p className="text-sm text-gray-400">Welcome,</p>
           <p className="truncate font-semibold">{displayName}</p>
-          <span className="mt-1 inline-block rounded-full bg-indigo-600 px-2 py-0.5 text-xs capitalize">
-            {role === 'service_provider' ? 'Provider' : role}
+          <span className="mt-1 inline-block rounded-full bg-indigo-600 px-2 py-0.5 text-xs">
+            {roleLabel}
           </span>
         </div>
 
@@ -176,7 +178,7 @@ const DashboardLayout = ({ children }) => {
             >
               <div className="hidden text-right sm:block">
                 <p className="max-w-40 truncate text-sm font-bold text-slate-900">{displayName}</p>
-                <p className="text-xs capitalize text-slate-500">{role === 'service_provider' ? 'Provider' : role}</p>
+                <p className="text-xs text-slate-500">{roleLabel}</p>
               </div>
               <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
                 {displayName.slice(0, 1).toUpperCase()}
@@ -190,7 +192,7 @@ const DashboardLayout = ({ children }) => {
               >
                 <div className="border-b border-slate-100 px-3 py-3">
                   <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
-                  <p className="truncate text-xs text-slate-500">{user?.email || 'admin@localfixr'}</p>
+                  <p className="truncate text-xs text-slate-500">{user?.email || 'Email Not Available'}</p>
                 </div>
                 <button
                   type="button"

@@ -26,7 +26,7 @@ import LoadingGrid from '../components/ui/LoadingGrid'
 import StatCard from '../components/ui/StatCard'
 import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
-import { formatCurrency, formatDateTime } from '../utils/formatters'
+import { formatCurrency, formatDateTime, formatStatus } from '../utils/formatters'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 
 const blankService = {
@@ -243,7 +243,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     setSaving(true)
     try {
       await updateBookingStatus(bookingId, status)
-      showToast(`Booking ${status.replace('_', ' ')}`)
+      showToast(`Booking ${formatStatus(status)}`)
       await loadDashboard()
     } catch (err) {
       showToast(err.response?.data?.message || 'Unable to update booking')
@@ -319,10 +319,10 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
             <h2 className="text-xl font-black text-slate-900">Booking Requests</h2>
             <div className="flex items-center gap-4">
               <span className="text-sm font-semibold text-slate-500">
-                {bookings.filter(b => b.status === 'pending').length} pending
+                {bookings.filter(b => b.status === 'pending').length} Pending
               </span>
               <span className="text-sm font-semibold text-slate-500">
-                {bookings.filter(b => b.status === 'in_progress').length} in progress
+                {bookings.filter(b => b.status === 'in_progress').length} In Progress
               </span>
             </div>
           </div>
@@ -459,7 +459,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-xl font-black text-slate-900">My Services</h2>
-              <span className="text-sm font-semibold text-slate-500">{services.length} services</span>
+              <span className="text-sm font-semibold text-slate-500">{services.length} Services</span>
             </div>
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
               {services.map((service) => (
@@ -497,7 +497,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                 Average: {profile?.rating ? `${profile.rating.toFixed(1)} / 5` : 'No ratings yet'}
               </span>
               <span className="text-sm font-semibold text-slate-500">
-                {reviews.length} total
+                {reviews.length} Total
               </span>
             </div>
           </div>
@@ -595,7 +595,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
             {profileFormik.touched.serviceAreas && profileFormik.errors.serviceAreas && (
               <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.serviceAreas}</span>
             )}
-            <Button type="submit" disabled={saving} className="mt-5">Save profile</Button>
+            <Button type="submit" disabled={saving} className="mt-5">Save Profile</Button>
           </form>
 
           <DeleteAccountPanel userRole="service_provider" onError={setError} />

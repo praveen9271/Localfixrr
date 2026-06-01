@@ -7,4 +7,11 @@ export const formatDate = (value) =>
 export const formatDateTime = (value) =>
   value ? new Date(value).toLocaleString() : '-'
 
-export const formatStatus = (status = '') => String(status).replace('_', ' ')
+export const formatStatus = (status = '') =>
+  String(status)
+    .replace(/_/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')

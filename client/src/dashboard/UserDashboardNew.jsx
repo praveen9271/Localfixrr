@@ -63,7 +63,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   const [reviewBooking, setReviewBooking] = useState(null)
   const [selectedService, setSelectedService] = useState(null)
   
-  // Search and filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
@@ -211,11 +210,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
       return
     }
 
-    if (action === 'save') {
-      showToast('Service saved for later')
-      return
-    }
-
     if (action === 'report') {
       showToast('Report received. Our team will review this service.')
     }
@@ -229,10 +223,10 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   }
 
   const statCards = [
-    { id: 'total-bookings', label: 'Total bookings', value: stats.totalBookings || 0 },
+    { id: 'total-bookings', label: 'Total Bookings', value: stats.totalBookings || 0 },
     { id: 'pending', label: 'Pending', value: stats.pendingBookings || 0 },
     { id: 'completed', label: 'Completed', value: stats.completedBookings || 0 },
-    { id: 'total-spent', label: 'Total spent', value: formatCurrency(stats.totalSpent) },
+    { id: 'total-spent', label: 'Total Spent', value: formatCurrency(stats.totalSpent) },
   ]
 
   if (loading) {
@@ -330,7 +324,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-black text-slate-900 mb-4">Browse Services</h2>
             
-            {/* Search and Filters */}
             <div className="space-y-4">
               <div className="flex flex-col gap-4 sm:flex-row">
                 <input
@@ -375,7 +368,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
             </div>
           </div>
 
-          {/* Services Grid */}
           <div className="grid gap-5 lg:grid-cols-3">
             {services.map((service) => (
               <ServiceListingCard
@@ -408,7 +400,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
             )}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-2">
               <Button
@@ -489,7 +480,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
         </section>
       )}
 
-      {/* Booking Modal */}
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
         <form onSubmit={bookingFormik.handleSubmit}>
           <label className="mt-5 block text-sm font-semibold text-slate-700">
@@ -541,13 +531,12 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Sending...' : 'Confirm booking'}
+              {saving ? 'Sending...' : 'Confirm Booking'}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Review Modal */}
       <Modal isOpen={Boolean(reviewBooking)} title={reviewBooking ? `Review ${reviewBooking.service?.title}` : ''} onClose={() => setReviewBooking(null)}>
         <form onSubmit={reviewFormik.handleSubmit}>
           <label className="mt-5 block text-sm font-semibold text-slate-700">
@@ -581,7 +570,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setReviewBooking(null)}>Cancel</Button>
             <Button type="submit" disabled={saving}>
-              Submit review
+              Submit Review
             </Button>
           </div>
         </form>
@@ -618,7 +607,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
               <div>
                 <h3 className="font-bold text-slate-900">Provider</h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {selectedService.provider?.businessName || selectedService.provider?.user?.name || 'Provider not available'}
+                  {selectedService.provider?.businessName || selectedService.provider?.user?.name || 'Provider Not Available'}
                 </p>
               </div>
             </div>
@@ -626,7 +615,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
               <h3 className="font-bold text-slate-900">Rating</h3>
               <div className="mt-1 flex items-center gap-2 text-sm text-slate-600">
                 <span className="text-amber-500">{'★'.repeat(Math.floor(selectedService.rating || 0))}{'☆'.repeat(5 - Math.floor(selectedService.rating || 0))}</span>
-                <span>({selectedService.reviewsCount || 0} reviews)</span>
+                <span>({selectedService.reviewsCount || 0} Reviews)</span>
               </div>
             </div>
             

@@ -246,7 +246,7 @@ function ProviderDetails() {
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setBookingOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 font-semibold">Close</button>
               <button disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
-                {saving ? 'Sending...' : 'Confirm booking'}
+                {saving ? 'Sending...' : 'Confirm Booking'}
               </button>
             </div>
           </form>

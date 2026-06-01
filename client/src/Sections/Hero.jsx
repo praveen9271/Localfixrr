@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import * as Yup from "yup";
 import Icon from "../component/Icon";
 import { getPublicServices } from "../services/dashboardService";
-import { SERVICE_AREA_FULL, isSupportedLocation, unsupportedLocationMessage } from "../utils/serviceArea";
+import { SERVICE_AREA_FULL } from "../utils/serviceArea";
 import { button3d } from "../utils/tailwindStyles";
 import serviceProviderImg from "../assets/serviceprovider.png";
 
@@ -51,10 +51,6 @@ const getShortcutCard = (category) => {
 };
 
 const heroSearchSchema = Yup.object({
-  location: Yup.string()
-    .trim()
-    .required("Location is required.")
-    .test("supported-location", unsupportedLocationMessage, (value) => !value || isSupportedLocation(value.trim())),
   service: Yup.string().trim().required("Choose a service to search."),
 });
 
@@ -65,28 +61,17 @@ function Hero({ darkMode, onToast }) {
   const [serviceOpen, setServiceOpen] = useState(false);
   const serviceSelectRef = useRef(null);
 
-  const submitSearch = (selectedService, selectedLocation, requireAllInputs = true) => {
-    const trimmedLocation = selectedLocation.trim();
+  const submitSearch = (selectedService, requireService = true) => {
     const cleanService = selectedService.trim();
 
-    if (requireAllInputs && !trimmedLocation) {
-      onToast?.("Location is required.");
-      return;
-    }
-
-    if (requireAllInputs && !cleanService) {
+    if (requireService && !cleanService) {
       onToast?.("Choose a service to search.");
-      return;
-    }
-
-    if (!isSupportedLocation(trimmedLocation)) {
-      onToast?.(unsupportedLocationMessage);
       return;
     }
 
     const params = new URLSearchParams();
 
-    if (trimmedLocation) params.set("location", trimmedLocation);
+    params.set("location", SERVICE_AREA_FULL);
     if (cleanService) params.set("category", cleanService);
 
     setIsSearching(true);
@@ -96,9 +81,9 @@ function Hero({ darkMode, onToast }) {
   };
 
   const searchFormik = useFormik({
-    initialValues: { location: SERVICE_AREA_FULL, service: "" },
+    initialValues: { service: "" },
     validationSchema: heroSearchSchema,
-    onSubmit: (values) => submitSearch(values.service, values.location, true),
+    onSubmit: (values) => submitSearch(values.service, true),
   });
 
   useEffect(() => {
@@ -136,28 +121,13 @@ function Hero({ darkMode, onToast }) {
   }, []);
 
   const handleQuickService = (selectedService) => {
-    const trimmedLocation = searchFormik.values.location.trim();
-
-    if (!isSupportedLocation(trimmedLocation)) {
-      searchFormik.setFieldTouched("location", true, false);
-      onToast?.(unsupportedLocationMessage);
-      return;
-    }
-
     const params = new URLSearchParams({
-      location: trimmedLocation || SERVICE_AREA_FULL,
+      location: SERVICE_AREA_FULL,
       category: selectedService,
     });
     navigate(`/services?${params.toString()}`);
   };
 
-  const trimmedLocation = searchFormik.values.location.trim();
-  const locationUnavailable = Boolean(trimmedLocation && !isSupportedLocation(trimmedLocation));
-  const locationError =
-    (searchFormik.touched.location || searchFormik.submitCount > 0 || locationUnavailable) &&
-    searchFormik.errors.location
-      ? searchFormik.errors.location
-      : "";
   const serviceError =
     (searchFormik.touched.service || searchFormik.submitCount > 0) && searchFormik.errors.service
       ? searchFormik.errors.service
@@ -181,14 +151,14 @@ function Hero({ darkMode, onToast }) {
                 : "border-emerald-100 bg-white text-slate-600"
             }`}
           >
-            <div className="flex -space-x-2">
-              <span className={`grid h-8 w-8 place-items-center rounded-full border text-xs font-black ${darkMode ? "border-emerald-300/40 bg-emerald-400/18 text-emerald-100" : "border-white bg-emerald-100 text-emerald-700"}`}>
+            <div className="flex -space-x-1">
+              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-emerald-400/18 text-emerald-100" : "bg-emerald-100 text-emerald-700"}`}>
                 A
               </span>
-              <span className={`grid h-8 w-8 place-items-center rounded-full border text-xs font-black ${darkMode ? "border-amber-300/40 bg-amber-400/18 text-amber-100" : "border-white bg-orange-100 text-orange-700"}`}>
+              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-amber-400/18 text-amber-100" : "bg-orange-100 text-orange-700"}`}>
                 R
               </span>
-              <span className={`grid h-8 w-8 place-items-center rounded-full border text-xs font-black ${darkMode ? "border-indigo-300/40 bg-indigo-400/20 text-indigo-100" : "border-white bg-indigo-100 text-indigo-700"}`}>
+              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-indigo-400/20 text-indigo-100" : "bg-indigo-100 text-indigo-700"}`}>
                 S
               </span>
             </div>
@@ -207,7 +177,7 @@ function Hero({ darkMode, onToast }) {
             className={`mt-4 max-w-xl text-lg leading-8 ${darkMode ? "text-slate-300" : "text-slate-500"}`}
           >
             Connect with local experts for repair and maintenance needs. Enter
-            your area to check service availability.
+            your service need and find providers in Phagwara.
           </p>
 
           <form
@@ -218,32 +188,24 @@ function Hero({ darkMode, onToast }) {
                 : "border-white bg-white"
             }`}
           >
-            <label
-              className={`relative flex min-h-18 cursor-text items-center gap-3 rounded-[1.25rem] px-4 transition focus-within:bg-indigo-50/50 ${locationUnavailable ? "bg-rose-50" : darkMode ? "bg-white/5" : "bg-white"}`}
+            <button
+              type="button"
+              onClick={() => onToast?.("LocalFixr is available in Phagwara only.")}
+              className={`relative flex min-h-18 cursor-pointer items-center gap-3 rounded-[1.25rem] px-4 text-left transition hover:bg-indigo-50/50 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 ${darkMode ? "bg-white/5 hover:bg-white/8" : "bg-white"}`}
+              aria-label="LocalFixr is available in Phagwara only"
             >
               <Icon name="location" className="h-5 w-5 shrink-0 text-indigo-600" />
               <span className="min-w-0 flex-1">
                 <span
                   className={`flex items-center gap-1 whitespace-nowrap text-xs font-black ${darkMode ? "text-slate-200" : "text-slate-800"}`}
                 >
-                  Your Location <span className="text-rose-500">*</span>
+                  Service Area
                 </span>
-                <input
-                  name="location"
-                  value={searchFormik.values.location}
-                  onChange={searchFormik.handleChange}
-                  onBlur={searchFormik.handleBlur}
-                  placeholder={SERVICE_AREA_FULL}
-                  className={`mt-1 w-full cursor-text truncate bg-transparent text-sm outline-none placeholder:text-slate-400 ${darkMode ? "text-white" : "text-slate-700"}`}
-                />
-                {locationError && (
-                  <span className="mt-1 block text-xs font-semibold text-rose-600">
-                    {locationError}
-                  </span>
-                )}
+                <span className={`mt-1 block whitespace-normal text-sm font-semibold leading-5 ${darkMode ? "text-white" : "text-slate-700"}`}>
+                  Available In Phagwara
+                </span>
               </span>
-              <Icon name="chevronDown" className="h-4 w-4 shrink-0 cursor-pointer text-indigo-600" />
-            </label>
+            </button>
             <div className="relative" ref={serviceSelectRef}>
               <div className={`relative flex min-h-18 cursor-pointer items-center gap-3 rounded-[1.25rem] px-4 transition focus-within:bg-indigo-50/50 ${darkMode ? "bg-white/5" : "bg-white"}`}>
                 <Icon name="wrench" className="h-5 w-5 shrink-0 text-indigo-600" />
@@ -378,9 +340,9 @@ function Hero({ darkMode, onToast }) {
                 className={`${button3d} group inline-flex cursor-pointer items-center gap-3 rounded-full focus:outline-none focus:ring-4 focus:ring-indigo-200`}
                 aria-label={`Browse ${card.query} services`}
               >
-                <span className="grid h-13 w-13 shrink-0 place-items-center rounded-full border border-white bg-white/95 shadow-[0_12px_32px_rgba(37,99,235,0.14)] ring-1 ring-blue-100/80 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_20px_46px_rgba(37,99,235,0.2)]">
-                  <span className={`grid h-8 w-8 place-items-center rounded-full ${card.tint}`}>
-                    <Icon name={card.icon} className="h-4 w-4" />
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-white bg-white/95 shadow-[0_14px_34px_rgba(37,99,235,0.16)] ring-1 ring-blue-100/80 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_22px_48px_rgba(37,99,235,0.22)]">
+                  <span className={`grid h-10 w-10 place-items-center rounded-full ${card.tint}`}>
+                    <Icon name={card.icon} className="h-5 w-5" />
                   </span>
                 </span>
                 <span className="rounded-full border border-white bg-white/90 px-2.5 py-1 text-[0.68rem] font-black leading-tight text-slate-900 shadow-sm transition group-hover:bg-white">

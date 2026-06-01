@@ -374,14 +374,14 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   const activeTabConfig = tabs.find((tab) => tab.key === activeTab) || tabs[0]
 
   const kpis = [
-    { label: 'Total Users', value: stats.totalUsers || 0, hint: 'Marketplace customers', icon: Users, color: 'bg-indigo-600', path: '/dashboard/admin/users', status: 'all', role: 'all' },
-    { label: 'Total Providers', value: stats.totalProviders || 0, hint: `${stats.pendingProviderRequests || 0} pending`, icon: UserCheck, color: 'bg-emerald-600', path: '/dashboard/admin/providers', status: 'all', role: 'all' },
-    { label: 'Total Services', value: stats.totalServices || 0, hint: 'Listed services', icon: Wrench, color: 'bg-sky-600', path: '/dashboard/admin/services', status: 'all', role: 'all' },
-    { label: 'Total Bookings', value: stats.totalBookings || 0, hint: `${stats.activeBookings || 0} active`, icon: CalendarCheck, color: 'bg-violet-600', path: '/dashboard/admin/bookings', status: 'all', role: 'all' },
-    { label: 'Completed', value: stats.completedBookings || 0, hint: 'Finished jobs', icon: CheckCircle2, color: 'bg-teal-600', path: '/dashboard/admin/bookings', status: 'completed', role: 'all' },
-    { label: 'Cancelled', value: stats.cancelledBookings || 0, hint: 'Cancelled jobs', icon: XCircle, color: 'bg-rose-600', path: '/dashboard/admin/bookings', status: 'cancelled', role: 'all' },
-    { label: 'Monthly Revenue', value: formatCurrency(stats.totalRevenue), hint: 'Completed bookings', icon: CircleDollarSign, color: 'bg-amber-600', path: '/dashboard/admin/reports', status: 'all', role: 'all' },
-    { label: 'Reviews', value: stats.totalReviews || 0, hint: `${stats.blockedUsers || 0} blocked users`, icon: Star, color: 'bg-fuchsia-600', path: '/dashboard/admin/reviews', status: 'all', role: 'all' },
+    { label: 'Total Users', value: stats.totalUsers || 0, hint: 'Marketplace Customers', icon: Users, color: 'bg-indigo-600', path: '/dashboard/admin/users', status: 'all', role: 'all' },
+    { label: 'Total Providers', value: stats.totalProviders || 0, hint: `${stats.pendingProviderRequests || 0} Pending`, icon: UserCheck, color: 'bg-emerald-600', path: '/dashboard/admin/providers', status: 'all', role: 'all' },
+    { label: 'Total Services', value: stats.totalServices || 0, hint: 'Listed Services', icon: Wrench, color: 'bg-sky-600', path: '/dashboard/admin/services', status: 'all', role: 'all' },
+    { label: 'Total Bookings', value: stats.totalBookings || 0, hint: `${stats.activeBookings || 0} Active`, icon: CalendarCheck, color: 'bg-violet-600', path: '/dashboard/admin/bookings', status: 'all', role: 'all' },
+    { label: 'Completed', value: stats.completedBookings || 0, hint: 'Finished Jobs', icon: CheckCircle2, color: 'bg-teal-600', path: '/dashboard/admin/bookings', status: 'completed', role: 'all' },
+    { label: 'Cancelled', value: stats.cancelledBookings || 0, hint: 'Cancelled Jobs', icon: XCircle, color: 'bg-rose-600', path: '/dashboard/admin/bookings', status: 'cancelled', role: 'all' },
+    { label: 'Monthly Revenue', value: formatCurrency(stats.totalRevenue), hint: 'Completed Bookings', icon: CircleDollarSign, color: 'bg-amber-600', path: '/dashboard/admin/reports', status: 'all', role: 'all' },
+    { label: 'Reviews', value: stats.totalReviews || 0, hint: `${stats.blockedUsers || 0} Blocked Users`, icon: Star, color: 'bg-fuchsia-600', path: '/dashboard/admin/reviews', status: 'all', role: 'all' },
   ]
 
   return (
@@ -451,7 +451,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 />
               </div>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-11 rounded-lg border border-slate-200 px-3 text-sm outline-none">
-                <option value="all">All status</option>
+                <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="blocked">Blocked</option>
@@ -597,7 +597,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                       </div>
                       <div className="text-right">
                         <p className="font-black text-amber-600">{Number(provider.rating || 0).toFixed(1)}</p>
-                        <p className="text-xs text-slate-500">{provider.reviewsCount || 0} reviews</p>
+                        <p className="text-xs text-slate-500">{provider.reviewsCount || 0} Reviews</p>
                       </div>
                     </div>
                   ))}
@@ -705,7 +705,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                   <input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} />
                   Active
                 </label>
-                <PrimaryButton onClick={saveCategory} disabled={saving}><Plus className="h-4 w-4" /> Save category</PrimaryButton>
+                <PrimaryButton onClick={saveCategory} disabled={saving}><Plus className="h-4 w-4" /> Save Category</PrimaryButton>
               </div>
             </Panel>
             <Panel>

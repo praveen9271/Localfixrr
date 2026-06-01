@@ -74,8 +74,9 @@ function Services() {
   const [saving, setSaving] = useState(false)
 
   const selectedCategory = normalizeCategory(searchParams.get('service') || searchParams.get('category') || '')
-  const selectedLocation = searchParams.get('location') || ''
+  const selectedLocation = searchParams.get('location') || SERVICE_AREA_FULL
   const search = searchParams.get('search') || ''
+  const hasSearchFilters = Boolean(selectedCategory || search)
 
   const categories = useMemo(
     () =>
@@ -181,11 +182,6 @@ function Services() {
       return
     }
 
-    if (action === 'save') {
-      showToast('Service saved for later')
-      return
-    }
-
     if (action === 'report') {
       showToast('Report received. Our team will review this service.')
     }
@@ -204,16 +200,11 @@ function Services() {
               ? `Showing available ${selectedCategory.toLowerCase()} service providers in ${SERVICE_AREA_FULL}.`
               : 'LocalFixr is currently serving Phagwara, Punjab only. Browse available local providers and send a service request.'}
           </p>
-          {(selectedCategory || selectedLocation || search) && (
+          {hasSearchFilters && (
             <div className="mt-5 flex flex-wrap gap-2">
               {selectedCategory && (
                 <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 ring-1 ring-indigo-100">
                   {selectedCategory}
-                </span>
-              )}
-              {selectedLocation && (
-                <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                  {selectedLocation}
                 </span>
               )}
               {search && (
@@ -233,16 +224,16 @@ function Services() {
           />
           <input
             value={selectedLocation}
-            onChange={(event) => updateParam('location', event.target.value)}
+            readOnly
             placeholder={SERVICE_AREA_FULL}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-400"
+            className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-700 outline-none"
           />
           <select
             value={selectedCategory}
             onChange={(event) => updateParam('category', event.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-400"
           >
-            <option value="">All categories</option>
+            <option value="">All Categories</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </div>
@@ -256,11 +247,11 @@ function Services() {
         <p className="font-semibold text-slate-700">
           {loading
             ? 'Loading services...'
-            : `${filteredServices.length} provider${filteredServices.length === 1 ? '' : 's'} found`}
+            : `${filteredServices.length} Provider${filteredServices.length === 1 ? '' : 's'} Found`}
         </p>
-        {(selectedCategory || selectedLocation || search) && (
+        {hasSearchFilters && (
           <Button onClick={() => setSearchParams({})} variant="secondary">
-            Clear filters
+            Clear Filters
           </Button>
         )}
       </div>
@@ -348,7 +339,7 @@ function Services() {
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
               <Button type="submit" disabled={saving}>
-                {saving ? 'Sending...' : 'Confirm booking'}
+                {saving ? 'Sending...' : 'Confirm Booking'}
               </Button>
             </div>
           </form>
