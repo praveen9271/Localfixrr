@@ -167,19 +167,32 @@ function UserProfile() {
             </label>
             <label className="block text-sm font-semibold text-slate-700">
               Phone Number <span className="text-rose-500">*</span>
-              <input
-                name="phone"
-                type="tel"
-                value={profileFormik.values.phone}
-                onChange={(event) => profileFormik.setFieldValue('phone', event.target.value.replace(/\D/g, '').slice(0, 10))}
-                onBlur={() => profileFormik.setFieldTouched('phone', true)}
-                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none transition focus:border-indigo-400 ${
+              <div
+                className={`mt-2 flex overflow-hidden rounded-lg border bg-white transition focus-within:border-indigo-400 ${
                   profileFormik.touched.phone && profileFormik.errors.phone ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
                 }`}
-              />
+              >
+                <span className="inline-flex items-center border-r border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-700">
+                  +91
+                </span>
+                <input
+                  name="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  value={profileFormik.values.phone}
+                  onChange={(event) => profileFormik.setFieldValue('phone', event.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onBlur={() => profileFormik.setFieldTouched('phone', true)}
+                  placeholder="10-digit mobile number"
+                  className="min-w-0 flex-1 bg-transparent px-4 py-3 outline-none"
+                />
+              </div>
               {profileFormik.touched.phone && profileFormik.errors.phone && (
                 <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.phone}</span>
               )}
+              <span className="mt-2 block text-xs font-semibold text-slate-500">
+                India country code is fixed. Enter only the 10-digit mobile number.
+              </span>
             </label>
           </div>
           <label className="block text-sm font-semibold text-slate-700">
