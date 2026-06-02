@@ -77,6 +77,7 @@ const getAllServices = async (req, res) => {
       if (categoryValues.some((value) => excludedPublicCategories.includes(value))) {
         return res.status(200).json({
           success: true,
+          data: [],
           count: 0,
           pagination: buildPagination(page, limit, 0),
           services: [],
@@ -99,6 +100,7 @@ const getAllServices = async (req, res) => {
     if (total === 0) {
       return res.status(200).json({
         success: true,
+        data: [],
         count: 0,
         pagination: buildPagination(page, limit, 0),
         services: [],
@@ -113,6 +115,7 @@ const getAllServices = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      data: services,
       count: services.length,
       pagination: buildPagination(page, limit, total),
       services
@@ -243,6 +246,7 @@ const getMyBookings = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      data: bookings,
       count: bookings.length,
       pagination: buildPagination(page, limit, total),
       bookings

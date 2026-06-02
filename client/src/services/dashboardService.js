@@ -77,8 +77,8 @@ export const updateAdminBookingStatus = async (id, data) => {
   return put(`/admin/bookings/${id}/status`, data);
 };
 
-export const getAdminCategories = async () => {
-  return get('/admin/categories');
+export const getAdminCategories = async (filters = {}) => {
+  return get('/admin/categories', filters);
 };
 
 export const createAdminCategory = async (categoryData) => {
@@ -93,8 +93,8 @@ export const deleteAdminCategory = async (id) => {
   return del(`/admin/categories/${id}`);
 };
 
-export const getAdminNotifications = async () => {
-  return get('/admin/notifications');
+export const getAdminNotifications = async (filters = {}) => {
+  return get('/admin/notifications', filters);
 };
 
 export const createAdminNotification = async (notificationData) => {

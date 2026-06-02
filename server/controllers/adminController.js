@@ -104,6 +104,28 @@ const applySearch = (query, fields, search) => {
   return { ...query, $or: fields.map((field) => ({ [field]: regex })) };
 };
 
+const getSort = (sortValue, allowedFields = ['createdAt']) => {
+  const rawSort = String(sortValue || '-createdAt').trim();
+  const direction = rawSort.startsWith('-') ? -1 : 1;
+  const field = rawSort.replace(/^-/, '');
+
+  if (!allowedFields.includes(field)) {
+    return { createdAt: -1 };
+  }
+
+  return { [field]: direction };
+};
+
+const sendPaginated = (res, key, items, pagination) => {
+  res.status(200).json({
+    success: true,
+    data: items,
+    count: items.length,
+    pagination,
+    [key]: items,
+  });
+};
+
 const monthWindow = () => {
   const now = new Date();
   return Array.from({ length: 6 }, (_, index) => {
@@ -130,7 +152,7 @@ const ensureProviderProfiles = async () => {
 
 const getAllUsers = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
-  const { role, status, search } = req.query;
+  const { role, status, search, sort } = req.query;
   let query = {};
   if (role && role !== 'all') query.role = role;
   if (status === 'active') query = { ...query, isActive: true, isBlocked: false };
@@ -139,8 +161,12 @@ const getAllUsers = asyncHandler(async (req, res) => {
   query = applySearch(query, ['name', 'email', 'phone', 'role'], search);
 
   const total = await User.countDocuments(query);
-  const users = await User.find(query).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limit);
-  res.status(200).json({ success: true, count: users.length, pagination: buildPagination(page, limit, total), users });
+  const users = await User.find(query)
+    .select('-password')
+    .sort(getSort(sort, ['createdAt', 'name', 'email', 'role']))
+    .skip(skip)
+    .limit(limit);
+  sendPaginated(res, 'users', users, buildPagination(page, limit, total));
 });
 
 const getUserById = asyncHandler(async (req, res) => {
@@ -201,7 +227,7 @@ const deleteProvider = asyncHandler(async (req, res) => {
 const getAllProviders = asyncHandler(async (req, res) => {
   await ensureProviderProfiles();
   const { page, limit, skip } = getPagination(req.query);
-  const { status, search } = req.query;
+  const { status, search, sort } = req.query;
   let query = {};
   if (status && status !== 'all') {
     if (status === 'verified') query.isVerified = true;
@@ -213,10 +239,10 @@ const getAllProviders = asyncHandler(async (req, res) => {
   const total = await Provider.countDocuments(query);
   const providers = await Provider.find(query)
     .populate('user', 'name email phone address role avatar isActive isBlocked createdAt')
-    .sort({ createdAt: -1 })
+    .sort(getSort(sort, ['createdAt', 'businessName', 'rating', 'earnings']))
     .skip(skip)
     .limit(limit);
-  res.status(200).json({ success: true, count: providers.length, pagination: buildPagination(page, limit, total), providers });
+  sendPaginated(res, 'providers', providers, buildPagination(page, limit, total));
 });
 
 const updateProviderStatus = asyncHandler(async (req, res) => {
@@ -245,7 +271,7 @@ const updateProviderStatus = asyncHandler(async (req, res) => {
 
 const getAllServices = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
-  const { category, status, search } = req.query;
+  const { category, status, search, sort } = req.query;
   let query = {};
   if (category && category !== 'all') query.category = category;
   if (status && status !== 'all') query.status = status;
@@ -258,10 +284,10 @@ const getAllServices = asyncHandler(async (req, res) => {
       select: 'businessName user rating reviewsCount verificationStatus',
       populate: { path: 'user', select: 'name email phone' },
     })
-    .sort({ createdAt: -1 })
+    .sort(getSort(sort, ['createdAt', 'title', 'category', 'price', 'status']))
     .skip(skip)
     .limit(limit);
-  res.status(200).json({ success: true, count: services.length, pagination: buildPagination(page, limit, total), services });
+  sendPaginated(res, 'services', services, buildPagination(page, limit, total));
 });
 
 const deleteService = asyncHandler(async (req, res) => {
@@ -293,13 +319,12 @@ const deleteService = asyncHandler(async (req, res) => {
 
 const getAllBookings = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
-  const { status, paymentStatus, search } = req.query;
+  const { status, paymentStatus, search, sort } = req.query;
   let query = {};
   if (status && status !== 'all') query.status = status;
   if (paymentStatus && paymentStatus !== 'all') query.paymentStatus = paymentStatus;
 
-  const total = await Booking.countDocuments(query);
-  let bookings = await Booking.find(query)
+  const baseQuery = Booking.find(query)
     .populate('service', 'title category price')
     .populate('customer', 'name email phone')
     .populate({
@@ -307,22 +332,25 @@ const getAllBookings = asyncHandler(async (req, res) => {
       select: 'businessName user',
       populate: { path: 'user', select: 'name email phone' },
     })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    .sort(getSort(sort, ['createdAt', 'date', 'status', 'totalAmount']));
 
   if (search) {
     const regex = new RegExp(String(search).trim(), 'i');
-    bookings = bookings.filter((booking) =>
+    const allBookings = await baseQuery;
+    const matchedBookings = allBookings.filter((booking) =>
       regex.test(booking.customer?.name || '') ||
       regex.test(booking.customer?.email || '') ||
       regex.test(booking.service?.title || '') ||
       regex.test(booking.provider?.businessName || '') ||
       regex.test(booking.status || ''),
     );
+    const bookings = matchedBookings.slice(skip, skip + limit);
+    return sendPaginated(res, 'bookings', bookings, buildPagination(page, limit, matchedBookings.length));
   }
 
-  res.status(200).json({ success: true, count: bookings.length, pagination: buildPagination(page, limit, total), bookings });
+  const total = await Booking.countDocuments(query);
+  const bookings = await baseQuery.skip(skip).limit(limit);
+  return sendPaginated(res, 'bookings', bookings, buildPagination(page, limit, total));
 });
 
 const updateBookingStatus = asyncHandler(async (req, res) => {
@@ -344,8 +372,8 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
 
 const getAllReviews = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
-  const total = await Review.countDocuments();
-  const reviews = await Review.find()
+  const { search, sort } = req.query;
+  const baseQuery = Review.find()
     .populate('user', 'name email')
     .populate('service', 'title category')
     .populate({
@@ -353,11 +381,25 @@ const getAllReviews = asyncHandler(async (req, res) => {
       select: 'businessName user',
       populate: { path: 'user', select: 'name email' },
     })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    .sort(getSort(sort, ['createdAt', 'rating']));
 
-  res.status(200).json({ success: true, count: reviews.length, pagination: buildPagination(page, limit, total), reviews });
+  if (search) {
+    const regex = new RegExp(String(search).trim(), 'i');
+    const allReviews = await baseQuery;
+    const matchedReviews = allReviews.filter((review) =>
+      regex.test(review.user?.name || '') ||
+      regex.test(review.user?.email || '') ||
+      regex.test(review.service?.title || '') ||
+      regex.test(review.provider?.businessName || '') ||
+      regex.test(review.comment || ''),
+    );
+    const reviews = matchedReviews.slice(skip, skip + limit);
+    return sendPaginated(res, 'reviews', reviews, buildPagination(page, limit, matchedReviews.length));
+  }
+
+  const total = await Review.countDocuments();
+  const reviews = await baseQuery.skip(skip).limit(limit);
+  return sendPaginated(res, 'reviews', reviews, buildPagination(page, limit, total));
 });
 
 const deleteReview = asyncHandler(async (req, res) => {
@@ -369,8 +411,19 @@ const deleteReview = asyncHandler(async (req, res) => {
 });
 
 const getCategories = asyncHandler(async (req, res) => {
-  const categories = await Category.find().sort({ createdAt: -1 });
-  res.status(200).json({ success: true, categories });
+  const { page, limit, skip } = getPagination(req.query);
+  const { status, search, sort } = req.query;
+  let query = {};
+  if (status === 'active') query.isActive = true;
+  if (status === 'inactive') query.isActive = false;
+  query = applySearch(query, ['name', 'description'], search);
+
+  const total = await Category.countDocuments(query);
+  const categories = await Category.find(query)
+    .sort(getSort(sort, ['createdAt', 'name']))
+    .skip(skip)
+    .limit(limit);
+  sendPaginated(res, 'categories', categories, buildPagination(page, limit, total));
 });
 
 const createCategory = asyncHandler(async (req, res) => {
@@ -399,11 +452,21 @@ const deleteCategory = asyncHandler(async (req, res) => {
 });
 
 const getNotifications = asyncHandler(async (req, res) => {
-  const notifications = await Notification.find()
+  const { page, limit, skip } = getPagination(req.query);
+  const { status, type, search, sort } = req.query;
+  let query = {};
+  if (type && type !== 'all') query.type = type;
+  if (status === 'read') query.isRead = true;
+  if (status === 'unread') query.isRead = false;
+  query = applySearch(query, ['title', 'message', 'type'], search);
+
+  const total = await Notification.countDocuments(query);
+  const notifications = await Notification.find(query)
     .populate('recipient', 'name email role')
-    .sort({ createdAt: -1 })
-    .limit(100);
-  res.status(200).json({ success: true, notifications });
+    .sort(getSort(sort, ['createdAt', 'title', 'type']))
+    .skip(skip)
+    .limit(limit);
+  sendPaginated(res, 'notifications', notifications, buildPagination(page, limit, total));
 });
 
 const createNotification = asyncHandler(async (req, res) => {

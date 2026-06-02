@@ -123,6 +123,7 @@ const getMyServices = async (req, res) => {
     
     res.status(200).json({
       success: true,
+      data: services,
       count: services.length,
       pagination: buildPagination(page, limit, total),
       services
@@ -254,6 +255,7 @@ const getMyBookings = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      data: bookings,
       count: bookings.length,
       pagination: buildPagination(page, limit, total),
       bookings
@@ -396,11 +398,21 @@ const getProviderReviews = async (req, res) => {
     if (!provider) {
       return res.status(404).json({ success: false, message: 'Provider profile not found' });
     }
+    const { page, limit, skip } = getPagination(req.query);
+    const total = await Review.countDocuments({ provider: provider._id });
     const reviews = await Review.find({ provider: provider._id })
       .populate('user', 'name email')
       .populate('service', 'title')
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, count: reviews.length, reviews });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    res.status(200).json({
+      success: true,
+      data: reviews,
+      count: reviews.length,
+      pagination: buildPagination(page, limit, total),
+      reviews,
+    });
   } catch (error) {
     console.error('Get provider reviews error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });

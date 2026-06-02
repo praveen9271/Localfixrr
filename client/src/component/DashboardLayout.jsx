@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { getCurrentUser, getUserRole, logout } from '../services/authService'
 import Icon from './Icon'
 import logo from '../assets/logo.png'
+import ConfirmModal from '../components/ui/ConfirmModal'
 
 const roleNavItems = {
   admin: [
@@ -43,6 +44,7 @@ const toTitleCase = (value) =>
 const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const user = getCurrentUser()
@@ -56,9 +58,16 @@ const DashboardLayout = ({ children }) => {
   ]
   const sidebarNavItems = navItems.filter((item) => item.label !== 'Settings')
 
+  const requestLogout = () => {
+    setProfileMenuOpen(false)
+    setSidebarOpen(false)
+    setLogoutConfirmOpen(true)
+  }
+
   const handleLogout = () => {
     logout()
     setProfileMenuOpen(false)
+    setLogoutConfirmOpen(false)
     navigate('/', { replace: true })
   }
 
@@ -133,7 +142,7 @@ const DashboardLayout = ({ children }) => {
         <div className="shrink-0 border-t border-slate-700 px-4 py-4">
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={requestLogout}
             className="flex w-full items-center rounded-lg px-4 py-3 text-left text-gray-300 transition-colors hover:bg-red-600 hover:text-white"
           >
             <Icon name="logout" className="mr-3 h-5 w-5 shrink-0" />
@@ -206,7 +215,7 @@ const DashboardLayout = ({ children }) => {
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={handleLogout}
+                  onClick={requestLogout}
                   className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
                 >
                   <Icon name="logout" className="mr-3 h-4 w-4 shrink-0" />
@@ -230,6 +239,17 @@ const DashboardLayout = ({ children }) => {
           {children}
         </main>
       </div>
+
+      <ConfirmModal
+        isOpen={logoutConfirmOpen}
+        title="Logout"
+        message="Are you sure you want to logout from your LocalFixr account?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleLogout}
+        onClose={() => setLogoutConfirmOpen(false)}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { motion } from 'framer-motion'
 import {
@@ -67,6 +67,7 @@ import {
   updateUser,
 } from '../services/dashboardService'
 import Alert from '../components/ui/Alert'
+import Pagination from '../components/common/Pagination'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import DraggableGrid from '../components/ui/DraggableGrid'
 import EmptyState from '../components/ui/EmptyState'
@@ -74,6 +75,7 @@ import LoadingGrid from '../components/ui/LoadingGrid'
 import Toast from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../utils/formatters'
 import useDebounce from '../hooks/useDebounce'
+import usePagination from '../hooks/usePagination'
 
 const tabs = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard/admin', icon: LayoutDashboard },
@@ -177,7 +179,7 @@ function KpiCard({ icon: Icon, label, value, hint, color, onClick }) {
   )
 }
 
-function DataTable({ columns, rows, emptyTitle, rowKey }) {
+function DataTable({ columns, rows, emptyTitle, rowKey, loading = false }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
@@ -189,7 +191,17 @@ function DataTable({ columns, rows, emptyTitle, rowKey }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {loading ? (
+            Array.from({ length: 5 }).map((_, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-slate-100">
+                {columns.map((column) => (
+                  <td key={column.key} className="px-4 py-3">
+                    <div className="h-4 animate-pulse rounded bg-slate-200" />
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : rows.map((row) => (
             <tr key={rowKey(row)} className="border-b border-slate-100 transition hover:bg-slate-50">
               {columns.map((column) => (
                 <td key={column.key} className="px-4 py-3 align-middle text-slate-700">
@@ -200,10 +212,12 @@ function DataTable({ columns, rows, emptyTitle, rowKey }) {
           ))}
         </tbody>
       </table>
-      {rows.length === 0 && <EmptyState title={emptyTitle} message="Try adjusting the search or filters." />}
+      {!loading && rows.length === 0 && <EmptyState title={emptyTitle} message="Try adjusting the search or filters." />}
     </div>
   )
 }
+
+const paginatedTabs = ['users', 'providers', 'services', 'categories', 'bookings', 'reviews', 'notifications']
 
 function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   const navigate = useNavigate()
@@ -227,9 +241,12 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
   const [darkMode, setDarkMode] = useState(false)
+  const [tableLoading, setTableLoading] = useState(false)
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger' })
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'Wrench', description: '', isActive: true })
   const [notificationForm, setNotificationForm] = useState({ title: '', message: '', type: 'info' })
+  const { pagination, setLimit, setPage, setPagination } = usePagination(5)
+  const tableFilterKeyRef = useRef('')
 
   const stats = statsPayload.stats || {}
   const analytics = statsPayload.analytics || {}
@@ -239,41 +256,16 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
     setTimeout(() => setToast(''), 3200)
   }
 
-  const loadDashboard = async () => {
+  const loadStats = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [
-        statsData,
-        usersData,
-        providersData,
-        servicesData,
-        bookingsData,
-        reviewsData,
-        categoriesData,
-        notificationsData,
-        reportsData,
-        logsData,
-      ] = await Promise.all([
+      const [statsData, reportsData, logsData] = await Promise.all([
         getAdminStats(),
-        getAllUsers({ limit: 100 }),
-        getAllProviders({ limit: 100 }),
-        getAdminServices({ limit: 100 }),
-        getAdminBookings({ limit: 100 }),
-        getAdminReviews({ limit: 100 }),
-        getAdminCategories(),
-        getAdminNotifications(),
         getAdminReports(),
         getAdminLogs(),
       ])
       setStatsPayload(statsData)
-      setUsers(usersData.users || [])
-      setProviders(providersData.providers || [])
-      setServices(servicesData.services || [])
-      setBookings(bookingsData.bookings || [])
-      setReviews(reviewsData.reviews || [])
-      setCategories(categoriesData.categories || [])
-      setNotifications(notificationsData.notifications || [])
       setReports(reportsData.reports || [])
       setLogs(logsData.logs || [])
     } catch (err) {
@@ -281,37 +273,78 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  const fetchAdminTableData = useCallback(async (overrides = {}) => {
+    if (!paginatedTabs.includes(activeTab)) return
+
+    const page = overrides.page || pagination.currentPage
+    const limit = overrides.limit || pagination.limit
+    const params = {
+      page,
+      limit,
+      search: debouncedSearchQuery,
+      sort: '-createdAt',
+    }
+
+    if (activeTab === 'users') {
+      params.role = roleFilter
+      params.status = statusFilter
+    } else if (['providers', 'services', 'categories', 'bookings'].includes(activeTab)) {
+      params.status = statusFilter
+    }
+
+    setTableLoading(true)
+    setError('')
+    try {
+      let response
+      if (activeTab === 'users') response = await getAllUsers(params)
+      if (activeTab === 'providers') response = await getAllProviders(params)
+      if (activeTab === 'services') response = await getAdminServices(params)
+      if (activeTab === 'categories') response = await getAdminCategories(params)
+      if (activeTab === 'bookings') response = await getAdminBookings(params)
+      if (activeTab === 'reviews') response = await getAdminReviews(params)
+      if (activeTab === 'notifications') response = await getAdminNotifications(params)
+
+      const rows = response?.data || response?.[activeTab] || []
+      if (activeTab === 'users') setUsers(rows)
+      if (activeTab === 'providers') setProviders(rows)
+      if (activeTab === 'services') setServices(rows)
+      if (activeTab === 'categories') setCategories(rows)
+      if (activeTab === 'bookings') setBookings(rows)
+      if (activeTab === 'reviews') setReviews(rows)
+      if (activeTab === 'notifications') setNotifications(rows)
+      setPagination(response?.pagination)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load admin data')
+    } finally {
+      setTableLoading(false)
+    }
+  }, [activeTab, debouncedSearchQuery, pagination.currentPage, pagination.limit, roleFilter, setPagination, statusFilter])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadDashboard()
+      loadStats()
     }, 0)
     return () => clearTimeout(timer)
-  }, [])
+  }, [loadStats])
 
-  const filtered = useMemo(() => {
-    const q = debouncedSearchQuery.toLowerCase()
-    const match = (values) => !q || values.some((value) => String(value || '').toLowerCase().includes(q))
-    const statusMatch = (value) => statusFilter === 'all' || value === statusFilter
-    const roleMatch = (value) => roleFilter === 'all' || value === roleFilter
-    return {
-      users: users.filter((user) => match([user.name, user.email, user.phone, user.role]) && roleMatch(user.role) && statusMatch(user.isBlocked ? 'blocked' : user.isActive ? 'active' : 'inactive')),
-      providers: providers.filter((provider) => match([provider.businessName, provider.user?.name, provider.user?.email, provider.verificationStatus]) && statusMatch(provider.verificationStatus || (provider.isVerified ? 'verified' : 'pending'))),
-      services: services.filter((service) => match([service.title, service.category, service.provider?.businessName]) && statusMatch(service.status)),
-      bookings: bookings.filter((booking) => match([booking.customer?.name, booking.service?.title, booking.provider?.businessName, booking.status]) && statusMatch(booking.status)),
-      reviews: reviews.filter((review) => match([review.user?.name, review.service?.title, review.comment])),
-      categories: categories.filter((category) => match([category.name, category.description]) && statusMatch(category.isActive ? 'active' : 'inactive')),
-      notifications: notifications.filter((notification) => match([notification.title, notification.message, notification.type])),
-    }
-  }, [bookings, categories, debouncedSearchQuery, notifications, providers, reviews, roleFilter, services, statusFilter, users])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const filterKey = `${activeTab}|${debouncedSearchQuery}|${roleFilter}|${statusFilter}|${pagination.limit}`
+      const filterChanged = tableFilterKeyRef.current !== filterKey
+      tableFilterKeyRef.current = filterKey
+      fetchAdminTableData({ page: filterChanged ? 1 : pagination.currentPage })
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [activeTab, debouncedSearchQuery, fetchAdminTableData, pagination.currentPage, pagination.limit, roleFilter, statusFilter])
 
   const runAction = async (action, successMessage) => {
     setSaving(true)
     try {
       await action()
       showToast(successMessage)
-      await loadDashboard()
+      await Promise.all([loadStats(), fetchAdminTableData()])
     } catch (err) {
       showToast(err.response?.data?.message || 'Action failed')
     } finally {
@@ -612,9 +645,10 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
         {activeTab === 'users' && (
           <Panel>
             <DataTable
-              rows={filtered.users}
+              rows={users}
               rowKey={(user) => user._id}
               emptyTitle="No users found"
+              loading={tableLoading}
               columns={[
                 { key: 'name', label: 'Name', render: (user) => <span className="font-bold text-slate-950">{user.name}</span> },
                 { key: 'email', label: 'Email' },
@@ -640,15 +674,22 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 },
               ]}
             />
+            <Pagination
+              pagination={pagination}
+              disabled={tableLoading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
           </Panel>
         )}
 
         {activeTab === 'providers' && (
           <Panel>
             <DataTable
-              rows={filtered.providers}
+              rows={providers}
               rowKey={(provider) => provider._id}
               emptyTitle="No providers found"
+              loading={tableLoading}
               columns={[
                 { key: 'businessName', label: 'Business', render: (provider) => <div><p className="font-bold text-slate-950">{provider.businessName || provider.user?.name}</p><p className="text-xs text-slate-500">{provider.user?.email}</p></div> },
                 { key: 'area', label: 'Area', render: (provider) => provider.serviceAreas?.[0] || provider.user?.address || '-' },
@@ -674,15 +715,22 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 },
               ]}
             />
+            <Pagination
+              pagination={pagination}
+              disabled={tableLoading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
           </Panel>
         )}
 
         {activeTab === 'services' && (
           <Panel>
             <DataTable
-              rows={filtered.services}
+              rows={services}
               rowKey={(service) => service._id}
               emptyTitle="No services found"
+              loading={tableLoading}
               columns={[
                 { key: 'title', label: 'Service', render: (service) => <span className="font-bold text-slate-950">{service.title}</span> },
                 { key: 'category', label: 'Category' },
@@ -691,6 +739,12 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'status', label: 'Status', render: (service) => <Badge status={service.status} /> },
                 { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteAdminService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
               ]}
+            />
+            <Pagination
+              pagination={pagination}
+              disabled={tableLoading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
             />
           </Panel>
         )}
@@ -712,9 +766,10 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
             </Panel>
             <Panel>
               <DataTable
-                rows={filtered.categories}
+                rows={categories}
                 rowKey={(category) => category._id}
                 emptyTitle="No categories found"
+                loading={tableLoading}
                 columns={[
                   { key: 'name', label: 'Name', render: (category) => <span className="font-bold text-slate-950">{category.name}</span> },
                   { key: 'description', label: 'Description' },
@@ -735,6 +790,12 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                   },
                 ]}
               />
+              <Pagination
+                pagination={pagination}
+                disabled={tableLoading}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+              />
             </Panel>
           </div>
         )}
@@ -742,9 +803,10 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
         {activeTab === 'bookings' && (
           <Panel>
             <DataTable
-              rows={filtered.bookings}
+              rows={bookings}
               rowKey={(booking) => booking._id}
               emptyTitle="No bookings found"
+              loading={tableLoading}
               columns={[
                 { key: 'customer', label: 'Customer', render: (booking) => booking.customer?.name || '-' },
                 { key: 'service', label: 'Service', render: (booking) => <span className="font-bold text-slate-950">{booking.service?.title || '-'}</span> },
@@ -763,15 +825,22 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 },
               ]}
             />
+            <Pagination
+              pagination={pagination}
+              disabled={tableLoading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
           </Panel>
         )}
 
         {activeTab === 'reviews' && (
           <Panel>
             <DataTable
-              rows={filtered.reviews}
+              rows={reviews}
               rowKey={(review) => review._id}
               emptyTitle="No reviews found"
+              loading={tableLoading}
               columns={[
                 { key: 'service', label: 'Service', render: (review) => review.service?.title || '-' },
                 { key: 'user', label: 'User', render: (review) => review.user?.name || '-' },
@@ -780,6 +849,12 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'comment', label: 'Comment' },
                 { key: 'actions', label: 'Actions', render: (review) => <IconButton title="Delete review" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete review', 'Remove this review?', () => deleteReview(review._id), 'Review deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
               ]}
+            />
+            <Pagination
+              pagination={pagination}
+              disabled={tableLoading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
             />
           </Panel>
         )}
@@ -839,9 +914,10 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
             </Panel>
             <Panel>
               <DataTable
-                rows={filtered.notifications}
+                rows={notifications}
                 rowKey={(notification) => notification._id}
                 emptyTitle="No notifications found"
+                loading={tableLoading}
                 columns={[
                   { key: 'title', label: 'Title', render: (notification) => <span className="font-bold text-slate-950">{notification.title}</span> },
                   { key: 'message', label: 'Message' },
@@ -849,6 +925,12 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                   { key: 'read', label: 'Read', render: (notification) => notification.isRead ? 'Yes' : 'No' },
                   { key: 'createdAt', label: 'Created', render: (notification) => formatDate(notification.createdAt) },
                 ]}
+              />
+              <Pagination
+                pagination={pagination}
+                disabled={tableLoading}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
               />
             </Panel>
           </div>
@@ -858,7 +940,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
           <div className="grid gap-5 xl:grid-cols-3">
             <button
               type="button"
-              onClick={() => runAction(loadDashboard, 'Admin access verified')}
+      onClick={() => runAction(loadStats, 'Admin access verified')}
               className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-200 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-100"
             >
               <ShieldCheck className="h-8 w-8 text-indigo-600" />
