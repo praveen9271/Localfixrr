@@ -933,6 +933,7 @@ function App() {
           onToggleDarkMode={() => setDarkMode((current) => !current)}
           onLoginClick={() => setIsLoginOpen(true)}
           onRegisterClick={() => setIsRegisterOpen(true)}
+          onToast={showToast}
         />
       )}
       <Suspense fallback={<PageLoader />}>

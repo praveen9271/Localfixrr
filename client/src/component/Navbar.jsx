@@ -5,6 +5,7 @@ import { scrollToSection } from "../utils/scroll";
 import Icon from "./Icon";
 import logo from "../assets/logo.png";
 import { isAuthenticated, getUserRole, logout } from "../services/authService";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 const navLinks = [
   { label: "Home", icon: "home", to: "/" },
@@ -34,8 +35,10 @@ function ThemeIconButton({ darkMode, onToggleDarkMode }) {
   );
 }
 
-function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
+function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick, onToast }) {
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [pendingCloseMenu, setPendingCloseMenu] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const authenticated = isAuthenticated();
@@ -69,10 +72,23 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
     }
   };
 
-  const handleLogout = (closeMenu) => {
+  const requestLogout = (closeMenu) => {
+    setPendingCloseMenu(() => closeMenu || null);
+    setLogoutConfirmOpen(true);
+  };
+
+  const handleLogout = () => {
     logout();
-    closeMenu?.();
+    pendingCloseMenu?.();
+    setPendingCloseMenu(null);
+    setLogoutConfirmOpen(false);
+    onToast?.("Logged out successfully.");
     navigate("/", { replace: true });
+  };
+
+  const closeLogoutConfirm = () => {
+    setPendingCloseMenu(null);
+    setLogoutConfirmOpen(false);
   };
 
   const handleDashboard = (closeMenu) => {
@@ -213,7 +229,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleLogout()}
+                        onClick={() => requestLogout()}
                         className="inline-flex h-10 cursor-pointer items-center justify-center rounded-full px-3 text-sm font-bold text-red-600 transition duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                       >
                         Logout
@@ -339,7 +355,7 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleLogout(close)}
+                        onClick={() => requestLogout(close)}
                         className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full border border-red-200 bg-white px-4 text-sm font-bold text-red-600 transition duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                       >
                         Logout
@@ -384,6 +400,16 @@ function Navbar({ darkMode, onToggleDarkMode, onLoginClick, onRegisterClick }) {
               </div>
             </div>
           </DisclosurePanel>
+          <ConfirmModal
+            isOpen={logoutConfirmOpen}
+            title="Logout"
+            message="Are you sure you want to logout from your LocalFixr account?"
+            confirmText="Logout"
+            cancelText="Cancel"
+            variant="danger"
+            onConfirm={handleLogout}
+            onClose={closeLogoutConfirm}
+          />
         </>
       )}
     </Disclosure>
