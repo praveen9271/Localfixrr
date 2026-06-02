@@ -46,7 +46,7 @@ function ProviderDetails() {
       try {
         const [serviceData, reviewsData] = await Promise.all([
           getPublicServiceDetails(id),
-          getServiceReviews(id),
+          getServiceReviews(id, { page: 1, limit: 10 }),
         ])
         setService(serviceData.service)
         setReviews(reviewsData.reviews || [])
@@ -131,7 +131,14 @@ function ProviderDetails() {
       <section className="mt-8 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           {service.image ? (
-            <img src={service.image} alt={service.title} className="h-96 w-full rounded-lg object-cover" />
+            <img
+              src={service.image}
+              alt={service.title}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className="h-96 w-full rounded-lg object-cover"
+            />
           ) : (
             <div className="grid h-96 place-items-center rounded-lg bg-indigo-50 text-6xl font-black text-indigo-600">
               {service.title?.slice(0, 2).toUpperCase()}

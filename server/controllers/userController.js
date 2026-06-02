@@ -96,7 +96,17 @@ const getAllServices = async (req, res) => {
       if (maxPrice !== undefined) query.price.$lte = Number(maxPrice);
     }
 
-    const total = await Service.countDocuments(query);
+    const [total, services] = await Promise.all([
+      Service.countDocuments(query),
+      Service.find(query)
+        .select('title description category price provider status location image rating reviewsCount createdAt')
+        .populate(populateServiceProvider)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
     if (total === 0) {
       return res.status(200).json({
         success: true,
@@ -106,12 +116,6 @@ const getAllServices = async (req, res) => {
         services: [],
       });
     }
-
-    const services = await Service.find(query)
-      .populate(populateServiceProvider)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
 
     res.status(200).json({
       success: true,
@@ -136,7 +140,9 @@ const getServiceById = async (req, res) => {
     }
 
     const service = await Service.findById(req.params.id)
-      .populate(populateServiceProvider);
+      .select('title description category price provider status location image images duration rating reviewsCount createdAt')
+      .populate(populateServiceProvider)
+      .lean();
 
     if (!service) {
       return res.status(404).json({ success: false, message: 'Service not found' });
@@ -379,11 +385,25 @@ const getServiceReviews = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Service not found' });
     }
 
-    const reviews = await Review.find({ service: req.params.id })
-      .populate('user', 'name')
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = getPagination(req.query);
+    const query = { service: req.params.id };
+    const [total, reviews] = await Promise.all([
+      Review.countDocuments(query),
+      Review.find(query)
+        .select('user provider booking service rating comment createdAt')
+        .populate('user', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
 
-    res.status(200).json({ success: true, count: reviews.length, reviews });
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      pagination: buildPagination(page, limit, total),
+      reviews,
+    });
   } catch (error) {
     console.error('Get reviews error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });

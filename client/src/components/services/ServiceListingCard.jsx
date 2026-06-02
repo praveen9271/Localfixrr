@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
   Brush,
@@ -237,4 +237,4 @@ function ServiceListingCard({
   )
 }
 
-export default ServiceListingCard
+export default memo(ServiceListingCard)

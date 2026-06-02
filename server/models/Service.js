@@ -84,6 +84,10 @@ serviceSchema.pre('validate', function normalizeServiceIdentity() {
 // Index for search
 serviceSchema.index({ title: 'text', description: 'text', category: 'text' });
 serviceSchema.index({ provider: 1, status: 1 });
+serviceSchema.index({ status: 1, category: 1, createdAt: -1 });
+serviceSchema.index({ category: 1, createdAt: -1 });
+serviceSchema.index({ createdAt: -1 });
+serviceSchema.index({ price: 1 });
 serviceSchema.index(
   { provider: 1, normalizedTitle: 1, category: 1 },
   {

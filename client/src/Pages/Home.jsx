@@ -75,21 +75,49 @@ const steps = [
 
 const normalizeIndianPhone = (value) => String(value || '').replace(/\D/g, '').slice(-10)
 
+function HomeServiceSkeleton() {
+  return (
+    <div className="min-h-[320px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex gap-3">
+        <div className="h-11 w-11 animate-pulse rounded-xl bg-slate-200" />
+        <div className="flex-1">
+          <div className="h-5 w-3/4 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-4 w-1/2 animate-pulse rounded bg-slate-200" />
+        </div>
+      </div>
+      <div className="mt-6 h-4 w-full animate-pulse rounded bg-slate-200" />
+      <div className="mt-3 h-4 w-5/6 animate-pulse rounded bg-slate-200" />
+      <div className="mt-3 h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+      <div className="mt-20 h-11 w-full animate-pulse rounded-lg bg-slate-200" />
+    </div>
+  )
+}
+
 function Home({ darkMode, onToast }) {
   const navigate = useNavigate()
   const [services, setServices] = useState([])
+  const [servicesLoading, setServicesLoading] = useState(true)
 
   useEffect(() => {
+    const controller = new AbortController()
+
     const timer = setTimeout(async () => {
+      setServicesLoading(true)
       try {
-        const data = await getPublicServices()
+        const data = await getPublicServices({ page: 1, limit: 4 }, { signal: controller.signal })
         setServices(data.services || [])
-      } catch {
+      } catch (error) {
+        if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') return
         setServices([])
+      } finally {
+        if (!controller.signal.aborted) setServicesLoading(false)
       }
     }, 0)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [])
 
   const serviceCategories = useMemo(() => {
@@ -121,7 +149,7 @@ function Home({ darkMode, onToast }) {
       }))
   }, [])
 
-  const topServices = services.slice(0, 4)
+  const topServices = services
 
   const handleServiceMenuAction = (action, service) => {
     const title = service?.title || 'service'
@@ -178,7 +206,10 @@ function Home({ darkMode, onToast }) {
         </div>
 
         <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {topServices.map((service) => (
+          {servicesLoading && Array.from({ length: 4 }).map((_, index) => (
+            <HomeServiceSkeleton key={`home-service-skeleton-${index}`} />
+          ))}
+          {!servicesLoading && topServices.map((service) => (
             <ServiceListingCard
               key={service._id}
               service={service}
@@ -193,7 +224,7 @@ function Home({ darkMode, onToast }) {
               onMenuAction={handleServiceMenuAction}
             />
           ))}
-          {topServices.length === 0 && (
+          {!servicesLoading && topServices.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-6 text-center text-slate-500 xl:col-span-4">
               No live services are available yet.
             </div>

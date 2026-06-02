@@ -27,5 +27,6 @@ const categorySchema = new mongoose.Schema(
 );
 
 categorySchema.index({ name: 'text', description: 'text' });
+categorySchema.index({ isActive: 1, createdAt: -1 });
 
 export default mongoose.model('Category', categorySchema);

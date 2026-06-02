@@ -38,5 +38,9 @@ const reviewSchema = new mongoose.Schema({
 
 reviewSchema.index({ user: 1, booking: 1 }, { unique: true });
 reviewSchema.index({ service: 1, provider: 1 });
+reviewSchema.index({ service: 1, createdAt: -1 });
+reviewSchema.index({ provider: 1, createdAt: -1 });
+reviewSchema.index({ user: 1, createdAt: -1 });
+reviewSchema.index({ rating: -1, createdAt: -1 });
 
 export default mongoose.model('Review', reviewSchema);

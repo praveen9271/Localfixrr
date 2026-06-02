@@ -197,8 +197,8 @@ export const getPublicServiceDetails = async (id) => {
   return get(`/services/${id}`);
 };
 
-export const getServiceReviews = async (id) => {
-  return get(`/services/${id}/reviews`);
+export const getServiceReviews = async (id, filters = {}, options = {}) => {
+  return get(`/services/${id}/reviews`, filters, options);
 };
 
 // Profile APIs

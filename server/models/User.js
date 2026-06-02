@@ -135,6 +135,9 @@ userSchema.index(
     partialFilterExpression: { phone: { $type: 'string', $ne: '' } },
   },
 );
+userSchema.index({ role: 1, isActive: 1, isBlocked: 1, createdAt: -1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ name: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function() {

@@ -55,5 +55,9 @@ const bookingSchema = new mongoose.Schema({
 bookingSchema.index({ customer: 1, status: 1 });
 bookingSchema.index({ provider: 1, status: 1 });
 bookingSchema.index({ service: 1 });
+bookingSchema.index({ status: 1, createdAt: -1 });
+bookingSchema.index({ customer: 1, createdAt: -1 });
+bookingSchema.index({ provider: 1, createdAt: -1 });
+bookingSchema.index({ date: 1, status: 1 });
 
 export default mongoose.model('Booking', bookingSchema);

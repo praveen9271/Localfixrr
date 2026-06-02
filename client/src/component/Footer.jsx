@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
-import { getPublicServices } from '../services/dashboardService'
 import { subscribeNewsletter } from '../services/newsletterService'
+import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 import { scrollToSection } from '../utils/scroll'
 import { button3d } from '../utils/tailwindStyles'
 import logo from '../assets/logo.png'
@@ -34,25 +34,7 @@ function Footer({ onToast }) {
   const navigate = useNavigate()
   const [message, setMessage] = useState('')
   const [subscribing, setSubscribing] = useState(false)
-  const [services, setServices] = useState([])
-
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const data = await getPublicServices()
-        setServices(data.services || [])
-      } catch {
-        setServices([])
-      }
-    }, 0)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  const serviceLinks = useMemo(
-    () => Array.from(new Set(services.map((service) => service.category).filter(Boolean))).slice(0, 5),
-    [services],
-  )
+  const serviceLinks = SERVICE_CATEGORIES.slice(0, 5)
 
   const navigateTo = (to) => {
     const [path, hash] = to.split('#')
@@ -93,6 +75,8 @@ function Footer({ onToast }) {
             <img
               src={logo}
               alt="LocalFixr logo"
+              loading="lazy"
+              decoding="async"
               className="h-11 w-11 object-contain"
             />
             <div>

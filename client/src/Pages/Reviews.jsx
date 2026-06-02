@@ -20,11 +20,11 @@ function Reviews() {
     setLoading(true)
     setError('')
     try {
-      const data = await getPublicServices()
+      const data = await getPublicServices({ page: 1, limit: 6 })
       const reviewGroups = await Promise.all(
         (data.services || []).map(async (service) => {
           try {
-            const response = await getServiceReviews(service._id)
+            const response = await getServiceReviews(service._id, { page: 1, limit: 3 })
             return (response.reviews || []).map((review) => ({
               ...review,
               service,

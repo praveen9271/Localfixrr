@@ -3,10 +3,10 @@ import { useFormik } from "formik";
 import { useNavigate } from "react-router";
 import * as Yup from "yup";
 import Icon from "../component/Icon";
-import { getPublicServices } from "../services/dashboardService";
+import { SERVICE_CATEGORIES } from "../constants/serviceCategories";
 import { SERVICE_AREA_FULL } from "../utils/serviceArea";
 import { button3d } from "../utils/tailwindStyles";
-import serviceProviderImg from "../assets/serviceprovider.png";
+import serviceProviderImg from "../assets/serviceprovider-optimized.jpg";
 
 const serviceShortcutStyles = {
   Plumbing: {
@@ -64,7 +64,6 @@ const heroSearchSchema = Yup.object({
 
 function Hero({ darkMode, onToast }) {
   const navigate = useNavigate();
-  const [serviceOptions, setServiceOptions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const serviceSelectRef = useRef(null);
@@ -94,22 +93,9 @@ function Hero({ darkMode, onToast }) {
     onSubmit: (values) => submitSearch(values.service, true),
   });
 
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const data = await getPublicServices();
-        setServiceOptions(data.services || []);
-      } catch {
-        setServiceOptions([]);
-      }
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   const categories = useMemo(
-    () => Array.from(new Set(serviceOptions.map((item) => item.category || item.title).filter(Boolean))).sort(),
-    [serviceOptions],
+    () => [...SERVICE_CATEGORIES].sort(),
+    [],
   );
 
   const quickServices = useMemo(
@@ -335,6 +321,9 @@ function Hero({ darkMode, onToast }) {
           <img
             src={serviceProviderImg}
             alt="LocalFixr service providers"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 h-full w-full rounded-[2rem] object-cover object-[68%_50%] sm:object-[82%_50%]"
           />
           <div className={`absolute inset-0 rounded-[2rem] ${darkMode ? "bg-gradient-to-r from-slate-950/55 via-slate-950/10 to-transparent" : "bg-gradient-to-r from-white/70 via-white/10 to-transparent"}`} />

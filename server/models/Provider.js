@@ -74,5 +74,8 @@ const providerSchema = new mongoose.Schema(
 );
 
 providerSchema.index({ businessName: 'text', bio: 'text', skills: 'text', serviceAreas: 'text' });
+providerSchema.index({ verificationStatus: 1, isVerified: 1, createdAt: -1 });
+providerSchema.index({ available: 1, createdAt: -1 });
+providerSchema.index({ rating: -1, createdAt: -1 });
 
 export default mongoose.model('Provider', providerSchema);

@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 const pageSizes = [5, 10, 20, 50]
 
 const getPageNumbers = (currentPage, totalPages) => {
@@ -84,4 +86,4 @@ function Pagination({ pagination, onPageChange, onLimitChange, disabled = false 
   )
 }
 
-export default Pagination
+export default memo(Pagination)
