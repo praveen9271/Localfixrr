@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate, useSearchParams } from 'react-router'
 import * as Yup from 'yup'
@@ -12,6 +12,8 @@ import Toast from '../components/ui/Toast'
 import ServiceListingCard from '../components/services/ServiceListingCard'
 import { SERVICE_AREA_FULL, isSupportedLocation, unsupportedLocationMessage } from '../utils/serviceArea'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
+import useDebounce from '../hooks/useDebounce'
+import useProtectedBooking from '../hooks/useProtectedBooking'
 
 const CATEGORY_OPTIONS = SERVICE_CATEGORIES
 
@@ -67,16 +69,24 @@ function Services() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [bookingService, setBookingService] = useState(null)
   const [visiblePhoneIds, setVisiblePhoneIds] = useState([])
   const [saving, setSaving] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const requestAbortRef = useRef(null)
+  const loadMoreRef = useRef(null)
 
   const selectedCategory = normalizeCategory(searchParams.get('service') || searchParams.get('category') || '')
   const selectedLocation = searchParams.get('location') || SERVICE_AREA_FULL
   const search = searchParams.get('search') || ''
-  const hasSearchFilters = Boolean(selectedCategory || search)
+  const [searchInput, setSearchInput] = useState(search)
+  const debouncedSearch = useDebounce(searchInput.trim(), 500)
+  const hasSearchFilters = Boolean(selectedCategory || searchInput.trim())
+  const hasMore = currentPage < totalPages
 
   const categories = useMemo(
     () =>
@@ -91,28 +101,96 @@ function Services() {
     setTimeout(() => setToast(''), 3000)
   }
 
-  const loadServices = useCallback(async () => {
-    setLoading(true)
+  const {
+    closeLoginPrompt,
+    goToLogin,
+    loginPromptOpen,
+    requestBooking,
+  } = useProtectedBooking({ onToast: showToast })
+
+  useEffect(() => {
+    if (debouncedSearch === search.trim()) return
+
+    const nextParams = new URLSearchParams(searchParams)
+    if (debouncedSearch) nextParams.set('search', debouncedSearch)
+    else nextParams.delete('search')
+    setSearchParams(nextParams, { replace: true })
+  }, [debouncedSearch, search, searchParams, setSearchParams])
+
+  const loadServices = useCallback(async (page = 1, { replace = false } = {}) => {
+    if (!isSupportedLocation(selectedLocation)) {
+      setServices([])
+      setCurrentPage(1)
+      setTotalPages(1)
+      setLoading(false)
+      setLoadingMore(false)
+      return
+    }
+
+    requestAbortRef.current?.abort()
+    const controller = new AbortController()
+    requestAbortRef.current = controller
+
+    if (replace || page === 1) {
+      setServices([])
+      setCurrentPage(1)
+      setTotalPages(1)
+    }
+    if (page === 1) setLoading(true)
+    else setLoadingMore(true)
     setError('')
     try {
       const data = await getPublicServices({
         category: selectedCategory,
-        search,
+        search: debouncedSearch,
+        page,
+        limit: 9,
+      }, { signal: controller.signal })
+
+      const nextServices = data.services || []
+      setServices((current) => {
+        const merged = replace || page === 1 ? nextServices : [...current, ...nextServices]
+        return Array.from(new Map(merged.map((service) => [service._id, service])).values())
       })
-      setServices(data.services || [])
+      setCurrentPage(data.pagination?.page || page)
+      setTotalPages(data.pagination?.pages || data.pagination?.totalPages || 1)
     } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError') return
       setError(err.response?.data?.message || 'Unable to load services')
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
-  }, [search, selectedCategory])
+  }, [debouncedSearch, selectedCategory, selectedLocation])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadServices()
+      loadServices(1, { replace: true })
     }, 0)
-    return () => clearTimeout(timer)
+
+    return () => {
+      clearTimeout(timer)
+      requestAbortRef.current?.abort()
+    }
   }, [loadServices])
+
+  useEffect(() => {
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore) return undefined
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadServices(currentPage + 1)
+        }
+      },
+      { rootMargin: '220px' },
+    )
+
+    observer.observe(loadMoreRef.current)
+    return () => observer.disconnect()
+  }, [currentPage, hasMore, loadServices, loading, loadingMore])
 
   const filteredServices = useMemo(() => {
     if (!isSupportedLocation(selectedLocation)) return []
@@ -207,9 +285,9 @@ function Services() {
                   {selectedCategory}
                 </span>
               )}
-              {search && (
+              {searchInput.trim() && (
                 <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
-                  Search: {search}
+                  Search: {searchInput.trim()}
                 </span>
               )}
             </div>
@@ -217,8 +295,8 @@ function Services() {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <input
-            value={search}
-            onChange={(event) => updateParam('search', event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Search"
             className="rounded-lg border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-400"
           />
@@ -250,7 +328,13 @@ function Services() {
             : `${filteredServices.length} Provider${filteredServices.length === 1 ? '' : 's'} Found`}
         </p>
         {hasSearchFilters && (
-          <Button onClick={() => setSearchParams({})} variant="secondary">
+          <Button
+            onClick={() => {
+              setSearchInput('')
+              setSearchParams({})
+            }}
+            variant="secondary"
+          >
             Clear Filters
           </Button>
         )}
@@ -266,9 +350,13 @@ function Services() {
               contactVisible={visiblePhoneIds.includes(service._id)}
               phone={getProviderPhone(service)}
               onBook={() => {
-                bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
-                setBookingService(service)
+                requestBooking(() => {
+                  bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                  setBookingService(service)
+                })
               }}
+              bookingDisabled={saving}
+              bookingLoading={saving && bookingService?._id === service._id}
               onDetails={() => navigate(`/provider/${service._id}`)}
               onContact={() => {
                 if (!getProviderPhone(service)) showToast('Provider phone number is not available yet')
@@ -287,6 +375,27 @@ function Services() {
           />
         </div>
       )}
+
+      {!loading && hasMore && (
+        <div ref={loadMoreRef} className="mt-8 flex justify-center py-4">
+          {loadingMore && (
+            <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+              Loading more services...
+            </span>
+          )}
+        </div>
+      )}
+
+      <Modal isOpen={loginPromptOpen} title="Login Required" onClose={closeLoginPrompt}>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Please sign in before booking a service. You can come back to the same service after login.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={closeLoginPrompt}>Cancel</Button>
+          <Button onClick={goToLogin}>Login</Button>
+        </div>
+      </Modal>
 
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
           <form onSubmit={bookingFormik.handleSubmit}>
@@ -339,6 +448,7 @@ function Services() {
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
               <Button type="submit" disabled={saving}>
+                {saving && <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
                 {saving ? 'Sending...' : 'Confirm Booking'}
               </Button>
             </div>

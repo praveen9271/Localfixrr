@@ -54,6 +54,8 @@ function ServiceListingCard({
   compact = false,
   showMenuDetails = false,
   showActionsMenu = true,
+  bookingDisabled = false,
+  bookingLoading = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -221,11 +223,13 @@ function ServiceListingCard({
         {!compact && (
           <button
           type="button"
+          disabled={bookingDisabled}
           onClick={() => onBook?.(service)}
-          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm shadow-indigo-600/20 transition hover:bg-indigo-700"
+          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm shadow-indigo-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-600/30 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
         >
-          {primaryLabel}
-          <ArrowRight className="h-4 w-4" />
+          {bookingLoading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+          {bookingLoading ? 'Booking...' : primaryLabel}
+          {!bookingLoading && <ArrowRight className="h-4 w-4" />}
         </button>
         )}
       </div>

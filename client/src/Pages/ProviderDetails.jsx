@@ -4,6 +4,9 @@ import { Link, useNavigate, useParams } from 'react-router'
 import * as Yup from 'yup'
 import { createBooking, getPublicServiceDetails, getServiceReviews } from '../services/dashboardService'
 import { getCurrentUser, isAuthenticated, isUser } from '../services/authService'
+import Button from '../components/ui/Button'
+import Modal from '../components/ui/Modal'
+import useProtectedBooking from '../hooks/useProtectedBooking'
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`
 
@@ -28,6 +31,13 @@ function ProviderDetails() {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
   }
+
+  const {
+    closeLoginPrompt,
+    goToLogin,
+    loginPromptOpen,
+    requestBooking,
+  } = useProtectedBooking({ onToast: showToast })
 
   useEffect(() => {
     const loadDetails = async () => {
@@ -166,16 +176,29 @@ function ProviderDetails() {
             <button
               type="button"
               onClick={() => {
-                bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
-                setBookingOpen(true)
+                requestBooking(() => {
+                  bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                  setBookingOpen(true)
+                })
               }}
-              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white"
+              disabled={saving}
+              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
             >
               Book service
             </button>
           </div>
         </div>
       </section>
+
+      <Modal isOpen={loginPromptOpen} title="Login Required" onClose={closeLoginPrompt}>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Please sign in before booking a service. You can continue booking after login.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={closeLoginPrompt}>Cancel</Button>
+          <Button onClick={goToLogin}>Login</Button>
+        </div>
+      </Modal>
 
       <section className="mt-10 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-black text-slate-900">Reviews</h2>
@@ -246,6 +269,7 @@ function ProviderDetails() {
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setBookingOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 font-semibold">Close</button>
               <button disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
+                {saving && <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white align-[-0.125em]" />}
                 {saving ? 'Sending...' : 'Confirm Booking'}
               </button>
             </div>

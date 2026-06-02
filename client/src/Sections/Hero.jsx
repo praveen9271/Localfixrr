@@ -12,27 +12,33 @@ const serviceShortcutStyles = {
   Plumbing: {
     icon: "wrench",
     tint: "bg-blue-50 text-blue-700",
+    darkTint: "bg-blue-400/18 text-blue-100",
   },
   Electrical: {
     icon: "bolt",
     tint: "bg-amber-50 text-amber-600",
+    darkTint: "bg-amber-400/18 text-amber-100",
   },
   "Appliance Repair": {
     title: "AC Repair",
     icon: "snow",
     tint: "bg-cyan-50 text-cyan-700",
+    darkTint: "bg-cyan-400/18 text-cyan-100",
   },
   Painting: {
     icon: "paint",
     tint: "bg-indigo-50 text-indigo-700",
+    darkTint: "bg-indigo-400/20 text-indigo-100",
   },
   Cleaning: {
     icon: "spark",
     tint: "bg-emerald-50 text-emerald-700",
+    darkTint: "bg-emerald-400/18 text-emerald-100",
   },
   Carpentry: {
     icon: "hammer",
     tint: "bg-orange-50 text-orange-700",
+    darkTint: "bg-orange-400/18 text-orange-100",
   },
 };
 
@@ -40,6 +46,7 @@ const getShortcutCard = (category) => {
   const style = serviceShortcutStyles[category] || {
     icon: "wrench",
     tint: "bg-slate-50 text-slate-700",
+    darkTint: "bg-slate-400/18 text-slate-100",
   };
 
   return {
@@ -47,6 +54,7 @@ const getShortcutCard = (category) => {
     query: category,
     icon: style.icon,
     tint: style.tint,
+    darkTint: style.darkTint,
   };
 };
 
@@ -340,12 +348,24 @@ function Hero({ darkMode, onToast }) {
                 className={`${button3d} group inline-flex cursor-pointer items-center gap-3 rounded-full focus:outline-none focus:ring-4 focus:ring-indigo-200`}
                 aria-label={`Browse ${card.query} services`}
               >
-                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-white bg-white/95 shadow-[0_14px_34px_rgba(37,99,235,0.16)] ring-1 ring-blue-100/80 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_22px_48px_rgba(37,99,235,0.22)]">
-                  <span className={`grid h-10 w-10 place-items-center rounded-full ${card.tint}`}>
+                <span
+                  className={`grid h-16 w-16 shrink-0 place-items-center rounded-full border shadow-[0_14px_34px_rgba(37,99,235,0.16)] ring-1 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_22px_48px_rgba(37,99,235,0.22)] ${
+                    darkMode
+                      ? "border-white/15 bg-slate-950/85 ring-white/10"
+                      : "border-white bg-white/95 ring-blue-100/80"
+                  }`}
+                >
+                  <span className={`grid h-10 w-10 place-items-center rounded-full ${darkMode ? card.darkTint : card.tint}`}>
                     <Icon name={card.icon} className="h-5 w-5" />
                   </span>
                 </span>
-                <span className="rounded-full border border-white bg-white/90 px-2.5 py-1 text-[0.68rem] font-black leading-tight text-slate-900 shadow-sm transition group-hover:bg-white">
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-black leading-tight shadow-sm transition ${
+                    darkMode
+                      ? "border-white/15 bg-slate-950/85 text-white group-hover:bg-slate-900"
+                      : "border-white bg-white/90 text-slate-900 group-hover:bg-white"
+                  }`}
+                >
                   {card.title}
                 </span>
               </button>
@@ -358,13 +378,17 @@ function Hero({ darkMode, onToast }) {
                 key={card.title}
                 type="button"
                 onClick={() => handleQuickService(card.query)}
-                className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-full border border-white bg-white/95 p-1.5 text-center shadow-lg"
+                className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-full border p-1.5 text-center shadow-lg ${
+                  darkMode ? "border-white/15 bg-slate-950/85" : "border-white bg-white/95"
+                }`}
                 aria-label={`Browse ${card.query} services`}
               >
-                <span className={`grid h-7 w-7 place-items-center rounded-full ${card.tint}`}>
+                <span className={`grid h-7 w-7 place-items-center rounded-full ${darkMode ? card.darkTint : card.tint}`}>
                   <Icon name={card.icon} className="h-3.5 w-3.5" />
                 </span>
-                <span className="mt-1 text-[0.56rem] font-black leading-tight text-slate-900">{card.title}</span>
+                <span className={`mt-1 text-[0.56rem] font-black leading-tight ${darkMode ? "text-white" : "text-slate-900"}`}>
+                  {card.title}
+                </span>
               </button>
             ))}
           </div>

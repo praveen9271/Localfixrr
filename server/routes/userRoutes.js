@@ -9,11 +9,11 @@ import {
   getUserStats,
   createReview
 } from '../controllers/userController.js';
-import { protect, userOnly } from '../middleware/roleMiddleware.js';
+import { authenticateUser, authorizeRoles } from '../middleware/roleMiddleware.js';
 
 // All routes are protected and user-only
-router.use(protect);
-router.use(userOnly);
+router.use(authenticateUser);
+router.use(authorizeRoles('user'));
 
 // Service browsing routes (public services)
 router.get('/services', getAllServices);
@@ -23,6 +23,7 @@ router.get('/services/:id', getServiceById);
 router.post('/bookings', createBooking);
 router.get('/bookings', getMyBookings);
 router.put('/bookings/:id/cancel', cancelBooking);
+router.delete('/bookings/:id', cancelBooking);
 
 // Review routes
 router.post('/reviews', createReview);

@@ -73,6 +73,7 @@ import EmptyState from '../components/ui/EmptyState'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import Toast from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../utils/formatters'
+import useDebounce from '../hooks/useDebounce'
 
 const tabs = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard/admin', icon: LayoutDashboard },
@@ -222,6 +223,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebounce(searchQuery.trim(), 500)
   const [statusFilter, setStatusFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
   const [darkMode, setDarkMode] = useState(false)
@@ -289,7 +291,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   }, [])
 
   const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
+    const q = debouncedSearchQuery.toLowerCase()
     const match = (values) => !q || values.some((value) => String(value || '').toLowerCase().includes(q))
     const statusMatch = (value) => statusFilter === 'all' || value === statusFilter
     const roleMatch = (value) => roleFilter === 'all' || value === roleFilter
@@ -302,7 +304,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
       categories: categories.filter((category) => match([category.name, category.description]) && statusMatch(category.isActive ? 'active' : 'inactive')),
       notifications: notifications.filter((notification) => match([notification.title, notification.message, notification.type])),
     }
-  }, [bookings, categories, notifications, providers, reviews, roleFilter, searchQuery, services, statusFilter, users])
+  }, [bookings, categories, debouncedSearchQuery, notifications, providers, reviews, roleFilter, services, statusFilter, users])
 
   const runAction = async (action, successMessage) => {
     setSaving(true)
@@ -687,7 +689,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'provider', label: 'Provider', render: (service) => service.provider?.businessName || service.provider?.user?.name || '-' },
                 { key: 'price', label: 'Price', render: (service) => formatCurrency(service.price) },
                 { key: 'status', label: 'Status', render: (service) => <Badge status={service.status} /> },
-                { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}?`, () => deleteService(service._id), 'Service deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
+                { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
               ]}
             />
           </Panel>

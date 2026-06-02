@@ -84,6 +84,20 @@ const cleanupOrphanProviderData = async (provider) => {
   ]);
 };
 
+const recalculateProviderRatings = async (providerId) => {
+  if (!providerId) return;
+
+  const [providerRating] = await Review.aggregate([
+    { $match: { provider: providerId } },
+    { $group: { _id: '$provider', rating: { $avg: '$rating' }, count: { $sum: 1 } } },
+  ]);
+
+  await Provider.findByIdAndUpdate(providerId, {
+    rating: Number((providerRating?.rating || 0).toFixed(1)),
+    reviewsCount: providerRating?.count || 0,
+  });
+};
+
 const applySearch = (query, fields, search) => {
   if (!search) return query;
   const regex = new RegExp(String(search).trim(), 'i');
@@ -253,17 +267,28 @@ const getAllServices = asyncHandler(async (req, res) => {
 const deleteService = asyncHandler(async (req, res) => {
   const service = await Service.findById(req.params.id);
   if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
-  const activeBookings = await Booking.countDocuments({
-    service: service._id,
-    status: { $in: ['pending', 'accepted', 'confirmed', 'in_progress'] },
+
+  const [deletedBookings, deletedReviews] = await Promise.all([
+    Booking.deleteMany({ service: service._id }),
+    Review.deleteMany({ service: service._id }),
+  ]);
+
+  await recalculateProviderRatings(service.provider);
+  await logAdminAction(req, 'deleted service', 'services', service._id, {
+    title: service.title,
+    deletedBookings: deletedBookings.deletedCount || 0,
+    deletedReviews: deletedReviews.deletedCount || 0,
   });
-  if (activeBookings > 0) {
-    return res.status(400).json({ success: false, message: 'Cannot delete a service with active bookings.' });
-  }
-  await Review.deleteMany({ service: service._id });
-  await logAdminAction(req, 'deleted service', 'services', service._id, { title: service.title });
   await service.deleteOne();
-  res.status(200).json({ success: true, message: 'Service deleted successfully' });
+  res.status(200).json({
+    success: true,
+    message: 'Service and related records deleted successfully',
+    deleted: {
+      bookings: deletedBookings.deletedCount || 0,
+      reviews: deletedReviews.deletedCount || 0,
+      services: 1,
+    },
+  });
 });
 
 const getAllBookings = asyncHandler(async (req, res) => {

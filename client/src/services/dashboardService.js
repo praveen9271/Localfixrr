@@ -8,8 +8,8 @@ const toQueryString = (filters = {}) => {
   return query ? `?${query}` : '';
 };
 
-const get = async (url, filters) => {
-  const response = await api.get(`${url}${toQueryString(filters)}`);
+const get = async (url, filters, options = {}) => {
+  const response = await api.get(`${url}${toQueryString(filters)}`, options);
   return response.data;
 };
 
@@ -160,8 +160,8 @@ export const getUserStats = async () => {
   return get('/user/stats');
 };
 
-export const browseServices = async (filters = {}) => {
-  return get('/services', filters);
+export const browseServices = async (filters = {}, options = {}) => {
+  return get('/services', filters, options);
 };
 
 export const getServiceDetails = async (id) => {
@@ -185,8 +185,8 @@ export const submitReview = async (reviewData) => {
 };
 
 // Public APIs
-export const getPublicServices = async (filters = {}) => {
-  return get('/services', filters);
+export const getPublicServices = async (filters = {}, options = {}) => {
+  return get('/services', filters, options);
 };
 
 export const getPublicServiceDetails = async (id) => {

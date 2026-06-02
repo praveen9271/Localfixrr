@@ -2,6 +2,7 @@ import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import Provider from '../models/Provider.js';
+import User from '../models/User.js';
 import mongoose from 'mongoose';
 import { buildPagination, getPagination } from '../utils/pagination.js';
 
@@ -59,7 +60,8 @@ const recalculateRatings = async (serviceId, providerId) => {
 // @access  Public
 const getAllServices = async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice } = req.query;
+    const { category, minPrice, maxPrice } = req.query;
+    const search = String(req.query.search || '').trim();
     const { page, limit, skip } = getPagination(req.query);
     let query = {
       status: 'active',
@@ -150,9 +152,33 @@ const getServiceById = async (req, res) => {
 const createBooking = async (req, res) => {
   try {
     const { serviceId, date, notes, address } = req.body;
+    const cleanAddress = String(address || req.user?.address || '').trim();
+    const cleanNotes = String(notes || '').trim();
 
     if (!serviceId || !date) {
-      return res.status(400).json({ message: 'Please provide service and date' });
+      return res.status(400).json({ success: false, message: 'Please provide service and date' });
+    }
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ success: false, message: 'Invalid service id' });
+    }
+    if (!cleanAddress || cleanAddress.length < 5) {
+      return res.status(400).json({ success: false, message: 'A complete service address is required' });
+    }
+    if (cleanNotes.length > 500) {
+      return res.status(400).json({ success: false, message: 'Notes must be 500 characters or less' });
+    }
+
+    const customerExists = await User.exists({
+      _id: req.user.id,
+      role: 'user',
+      isActive: true,
+      isBlocked: false,
+    });
+    if (!customerExists) {
+      return res.status(401).json({ success: false, message: 'Customer account is no longer available' });
     }
 
     const bookingDate = new Date(date);
@@ -163,21 +189,27 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Booking date cannot be in the past' });
     }
 
-    const service = await Service.findById(serviceId);
+    const service = await Service.findById(serviceId).populate('provider', 'available user');
     if (!service) {
       return res.status(404).json({ success: false, message: 'Service not found' });
     }
     if (service.status !== 'active') {
       return res.status(400).json({ success: false, message: 'Service is not available for booking' });
     }
+    if (!service.provider) {
+      return res.status(404).json({ success: false, message: 'Service provider not found' });
+    }
+    if (service.provider.available === false) {
+      return res.status(409).json({ success: false, message: 'Provider is not available for new bookings' });
+    }
 
     const booking = await Booking.create({
       service: serviceId,
       customer: req.user.id,
-      provider: service.provider,
+      provider: service.provider._id,
       date: new Date(date),
-      address: address || req.user.address,
-      notes: notes || '',
+      address: cleanAddress,
+      notes: cleanNotes,
       totalAmount: service.price
     });
 
@@ -226,6 +258,10 @@ const getMyBookings = async (req, res) => {
 // @access  User
 const cancelBooking = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid booking id' });
+    }
+
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {

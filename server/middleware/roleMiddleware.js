@@ -75,6 +75,20 @@ const userOnly = (req, res, next) => {
   }
 };
 
+const authenticateUser = protect;
+
+const authorizeRoles = (...roles) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Access denied for this account role' });
+  }
+
+  return next();
+};
+
 // Allow admin or service provider
 const adminOrProvider = (req, res, next) => {
   if (req.user && (req.user.role === 'admin' || req.user.role === 'service_provider')) {
@@ -84,4 +98,4 @@ const adminOrProvider = (req, res, next) => {
   }
 };
 
-export { protect, adminOnly, providerOnly, userOnly, adminOrProvider };
+export { protect, authenticateUser, authorizeRoles, adminOnly, providerOnly, userOnly, adminOrProvider };

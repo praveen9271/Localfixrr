@@ -11,6 +11,7 @@ import serviceRoutes from './routes/serviceRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import providerRoutes from './routes/providerRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import { getEmailStatus } from './services/otpService.js';
@@ -79,6 +80,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/provider', providerRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api', bookingRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/chat', chatRoutes);
 

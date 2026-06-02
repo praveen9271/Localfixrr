@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
@@ -24,6 +24,7 @@ import Toast from '../components/ui/Toast'
 import ServiceListingCard from '../components/services/ServiceListingCard'
 import { formatCurrency, formatDate } from '../utils/formatters'
 import { SERVICE_CATEGORY_OPTIONS } from '../constants/serviceCategories'
+import useDebounce from '../hooks/useDebounce'
 
 const CATEGORIES = SERVICE_CATEGORY_OPTIONS
 const getProviderPhone = (service) =>
@@ -68,6 +69,9 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [servicesLoading, setServicesLoading] = useState(false)
+  const serviceRequestAbortRef = useRef(null)
+  const debouncedSearchQuery = useDebounce(searchQuery.trim(), 500)
   
   const showToast = (message) => {
     setToast(message)
@@ -92,21 +96,32 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   }, [])
 
   const loadServices = useCallback(async (page = 1, filters = {}) => {
+    serviceRequestAbortRef.current?.abort()
+    const controller = new AbortController()
+    serviceRequestAbortRef.current = controller
+    if (page === 1) {
+      setServices([])
+      setCurrentPage(1)
+    }
+    setServicesLoading(true)
     try {
       const params = { page, limit: 12, ...filters }
-      if (searchQuery.trim()) params.search = searchQuery.trim()
+      if (debouncedSearchQuery) params.search = debouncedSearchQuery
       if (selectedCategory !== 'All') params.category = selectedCategory
       if (priceRange.min) params.minPrice = priceRange.min
       if (priceRange.max) params.maxPrice = priceRange.max
       
-      const data = await browseServices(params)
+      const data = await browseServices(params, { signal: controller.signal })
       setServices(data.services || [])
-      setTotalPages(data.pagination?.totalPages || 1)
+      setTotalPages(data.pagination?.pages || data.pagination?.totalPages || 1)
       setCurrentPage(page)
     } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError') return
       showToast(err.response?.data?.message || 'Failed to load services')
+    } finally {
+      if (!controller.signal.aborted) setServicesLoading(false)
     }
-  }, [priceRange.max, priceRange.min, searchQuery, selectedCategory])
+  }, [debouncedSearchQuery, priceRange.max, priceRange.min, selectedCategory])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -119,10 +134,14 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     if (activeTab === 'services') {
       const timer = setTimeout(() => {
         loadServices(1)
-      }, 300)
-      return () => clearTimeout(timer)
+      }, 0)
+
+      return () => {
+        clearTimeout(timer)
+        serviceRequestAbortRef.current?.abort()
+      }
     }
-  }, [activeTab, loadServices, priceRange, searchQuery, selectedCategory])
+  }, [activeTab, loadServices])
 
   const bookingFormik = useFormik({
     initialValues: { date: '', address: user?.address || '', notes: '' },
@@ -369,7 +388,15 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-3">
-            {services.map((service) => (
+            {servicesLoading && services.length === 0
+              ? Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="min-h-[430px] rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="h-12 w-12 animate-pulse rounded-xl bg-slate-200" />
+                  <div className="mt-5 h-5 w-2/3 animate-pulse rounded bg-slate-200" />
+                  <div className="mt-4 h-20 animate-pulse rounded bg-slate-200" />
+                </div>
+              ))
+              : services.map((service) => (
               <ServiceListingCard
                 key={service._id}
                 service={service}
@@ -390,7 +417,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 onMenuAction={handleServiceMenuAction}
               />
             ))}
-            {services.length === 0 && (
+            {!servicesLoading && services.length === 0 && (
               <div className="lg:col-span-3">
                 <EmptyState 
                   title="No services found" 
