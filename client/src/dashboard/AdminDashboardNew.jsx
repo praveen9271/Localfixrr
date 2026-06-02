@@ -46,7 +46,7 @@ import {
   createAdminNotification,
   deleteAdminCategory,
   deleteReview,
-  deleteService,
+  deleteAdminService,
   deleteProvider,
   deleteUser,
   exportAdminUsersCsv,
@@ -689,7 +689,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'provider', label: 'Provider', render: (service) => service.provider?.businessName || service.provider?.user?.name || '-' },
                 { key: 'price', label: 'Price', render: (service) => formatCurrency(service.price) },
                 { key: 'status', label: 'Status', render: (service) => <Badge status={service.status} /> },
-                { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
+                { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteAdminService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
               ]}
             />
           </Panel>

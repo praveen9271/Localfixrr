@@ -45,6 +45,10 @@ export const getAdminServices = async (filters = {}) => {
   return get('/admin/services', filters);
 };
 
+export const deleteAdminService = async (id) => {
+  return del(`/admin/services/${id}`);
+};
+
 export const getAdminBookings = async (filters = {}) => {
   return get('/admin/bookings', filters);
 };
