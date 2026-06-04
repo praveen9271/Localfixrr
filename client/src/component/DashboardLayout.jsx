@@ -112,14 +112,6 @@ const DashboardLayout = ({ children }) => {
           </button>
         </div>
 
-        <div className="shrink-0 border-b border-slate-700 px-6 py-4">
-          <p className="text-sm text-gray-400">Welcome,</p>
-          <p className="truncate font-semibold">{displayName}</p>
-          <span className="mt-1 inline-block rounded-full bg-indigo-600 px-2 py-0.5 text-xs">
-            {roleLabel}
-          </span>
-        </div>
-
         <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4">
           {sidebarNavItems.map((item) => (
             <Link

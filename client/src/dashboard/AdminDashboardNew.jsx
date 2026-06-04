@@ -167,12 +167,12 @@ function KpiCard({ icon: Icon, label, value, hint, color, onClick }) {
     >
       <div className="flex items-center gap-4">
         <span className={cx('grid h-12 w-12 shrink-0 place-items-center rounded-xl text-white transition group-hover:scale-105', color)}>
-          <Icon className="h-6 w-6" />
+          <Icon className="h-7 w-7" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
-          <p className="mt-1 text-xs font-semibold text-emerald-600">{hint}</p>
+          <p className="text-[15px] font-semibold text-slate-500">{label}</p>
+          <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
+          <p className="mt-1 text-sm font-semibold text-emerald-600">{hint}</p>
         </div>
       </div>
     </motion.button>
