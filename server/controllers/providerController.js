@@ -359,7 +359,7 @@ const getProviderStats = async (req, res) => {
 const getProviderProfile = async (req, res) => {
   try {
     const provider = req.provider || await ensureProviderProfile(req.user);
-    await provider.populate('user', 'name email phone address');
+    await provider.populate('user', 'name email phone address avatar');
     res.status(200).json({ success: true, provider });
   } catch (error) {
     console.error('Get provider profile error:', error);
@@ -370,7 +370,7 @@ const getProviderProfile = async (req, res) => {
 const updateProviderProfile = async (req, res) => {
   try {
     const provider = req.provider || await ensureProviderProfile(req.user);
-    const { businessName, bio, skills, serviceAreas, experienceYears, available } = req.body;
+    const { businessName, bio, skills, serviceAreas, experienceYears, available, avatar } = req.body;
 
     if (businessName !== undefined) provider.businessName = businessName;
     if (bio !== undefined) provider.bio = bio;
@@ -380,8 +380,11 @@ const updateProviderProfile = async (req, res) => {
     if (Array.isArray(serviceAreas)) provider.serviceAreas = serviceAreas;
     if (experienceYears !== undefined) provider.experienceYears = Number(experienceYears) || 0;
     if (available !== undefined) provider.available = Boolean(available);
+    if (avatar !== undefined) req.user.avatar = avatar;
 
     await provider.save();
+    if (avatar !== undefined) await req.user.save();
+    await provider.populate('user', 'name email phone address avatar');
     res.status(200).json({ success: true, message: 'Profile updated successfully', provider });
   } catch (error) {
     console.error('Update provider profile error:', error);

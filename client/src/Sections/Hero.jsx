@@ -62,6 +62,22 @@ const heroSearchSchema = Yup.object({
   service: Yup.string().trim().required("Choose a service to search."),
 });
 
+const demoAvatars = [
+  {
+    src: "https://images.unsplash.com/photo-1607346256330-dee7af15f7c5?auto=format&fit=crop&crop=faces&w=80&h=80&q=80",
+    alt: "Indian customer portrait",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1536766768598-e09213fdcf22?auto=format&fit=crop&crop=faces&w=80&h=80&q=80",
+    alt: "Indian provider portrait",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1619890632764-87d5fc97840a?auto=format&fit=crop&crop=faces&w=80&h=80&q=80",
+    alt: "Indian local expert portrait",
+    more: true,
+  },
+];
+
 function Hero({ darkMode, onToast }) {
   const navigate = useNavigate();
   const [isSearching, setIsSearching] = useState(false);
@@ -146,15 +162,25 @@ function Hero({ darkMode, onToast }) {
             }`}
           >
             <div className="flex -space-x-1">
-              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-emerald-400/18 text-emerald-100" : "bg-emerald-100 text-emerald-700"}`}>
-                A
-              </span>
-              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-amber-400/18 text-amber-100" : "bg-orange-100 text-orange-700"}`}>
-                R
-              </span>
-              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${darkMode ? "bg-indigo-400/20 text-indigo-100" : "bg-indigo-100 text-indigo-700"}`}>
-                S
-              </span>
+              {demoAvatars.map((avatar) => (
+                <span
+                  key={avatar.src}
+                  className={`relative h-8 w-8 overflow-hidden rounded-full ring-2 ${darkMode ? "ring-slate-900" : "ring-white"}`}
+                >
+                  <img
+                    src={avatar.src}
+                    alt={avatar.alt}
+                    className="h-full w-full rounded-full object-cover"
+                    loading="lazy"
+                  />
+                  {avatar.more && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-full bg-indigo-950/45 font-black leading-none text-white backdrop-blur-[1px]">
+                      <span className="text-sm">+</span>
+                      <span className="text-[10px]">5</span>
+                    </span>
+                  )}
+                </span>
+              ))}
             </div>
             Now onboarding local customers and providers
           </div>

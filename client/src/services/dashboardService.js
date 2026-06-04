@@ -159,6 +159,17 @@ export const updateProviderProfile = async (profileData) => {
   return put('/provider/profile', profileData);
 };
 
+export const uploadImage = async (file, folder = 'services') => {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('folder', folder);
+
+  const response = await api.post('/uploads/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
 // User APIs
 export const getUserStats = async () => {
   return get('/user/stats');

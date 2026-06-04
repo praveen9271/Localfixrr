@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { getCurrentUser, getUserRole, logout } from '../services/authService'
 import Icon from './Icon'
@@ -45,12 +45,28 @@ const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [user, setUser] = useState(() => getCurrentUser())
   const navigate = useNavigate()
   const location = useLocation()
-  const user = getCurrentUser()
-  const role = getUserRole()
+  const role = user?.role || getUserRole()
   const displayName = toTitleCase(user?.name) || 'User'
   const roleLabel = role === 'service_provider' ? 'Provider' : toTitleCase(role)
+  const dashboardKicker = role === 'service_provider'
+    ? 'LocalFixr Provider Panel'
+    : role === 'admin'
+      ? 'LocalFixr Admin Panel'
+      : 'LocalFixr Customer Panel'
+
+  useEffect(() => {
+    const refreshUser = () => setUser(getCurrentUser())
+
+    window.addEventListener('storage', refreshUser)
+    window.addEventListener('localfixr:user-updated', refreshUser)
+    return () => {
+      window.removeEventListener('storage', refreshUser)
+      window.removeEventListener('localfixr:user-updated', refreshUser)
+    }
+  }, [])
 
   const navItems = [
     { path: '/', label: 'Home', icon: 'home', exact: true },
@@ -164,7 +180,7 @@ const DashboardLayout = ({ children }) => {
             <img src={logo} alt="LocalFixr logo" className="hidden h-10 w-10 rounded-full border border-slate-200 bg-white object-contain p-1 sm:block" />
             <div className="min-w-0">
             <p className="truncate text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
-              {role === 'service_provider' ? 'LocalFixr Provider' : role === 'admin' ? 'LocalFixr Admin' : 'LocalFixr Customer'}
+              {dashboardKicker}
             </p>
             <h1 className="truncate text-lg font-black text-slate-950">{dashboardTitle}</h1>
             </div>
@@ -181,9 +197,17 @@ const DashboardLayout = ({ children }) => {
                 <p className="max-w-40 truncate text-sm font-bold text-slate-900">{displayName}</p>
                 <p className="text-xs text-slate-500">{roleLabel}</p>
               </div>
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
-                {displayName.slice(0, 1).toUpperCase()}
-              </div>
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={displayName}
+                  className="h-10 w-10 rounded-full bg-slate-100 object-cover ring-1 ring-slate-200"
+                />
+              ) : (
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
             </button>
 
             {profileMenuOpen && (
@@ -192,8 +216,19 @@ const DashboardLayout = ({ children }) => {
                 className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
               >
                 <div className="border-b border-slate-100 px-3 py-3">
-                  <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
-                  <p className="truncate text-xs text-slate-500">{user?.email || 'Email Not Available'}</p>
+                  <div className="flex items-center gap-3">
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt={displayName} className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200" />
+                    ) : (
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
+                        {displayName.slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
+                      <p className="truncate text-xs text-slate-500">{user?.email || 'Email Not Available'}</p>
+                    </div>
+                  </div>
                 </div>
                 <button
                   type="button"

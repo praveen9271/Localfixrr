@@ -15,6 +15,7 @@ import userRoutes from './routes/userRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 import { getEmailStatus } from './services/otpService.js';
 
 // Load env vars
@@ -85,6 +86,7 @@ app.use('/api/user', userRoutes);
 app.use('/api', bookingRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Health check route
 app.get('/', (req, res) => {

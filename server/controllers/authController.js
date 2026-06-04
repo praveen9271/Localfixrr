@@ -78,6 +78,7 @@ const formatUser = (user, provider) => ({
   email: user.email,
   phone: user.phone || '',
   address: user.address || '',
+  avatar: user.avatar || '',
   role: user.role,
   isActive: user.isActive,
   isEmailVerified: user.isEmailVerified,
@@ -798,7 +799,7 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone, address } = req.body;
+    const { name, phone, address, avatar } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -806,8 +807,12 @@ const updateProfile = async (req, res) => {
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
+    if (avatar !== undefined) user.avatar = avatar;
     await user.save();
-    res.status(200).json({ success: true, message: 'Profile updated successfully', user });
+    const provider = user.role === 'service_provider'
+      ? await Provider.findOne({ user: user._id })
+      : null;
+    res.status(200).json({ success: true, message: 'Profile updated successfully', user: formatUser(user, provider) });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });

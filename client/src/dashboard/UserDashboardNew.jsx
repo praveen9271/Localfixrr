@@ -261,11 +261,14 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Customer</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Customer Panel</p>
           <h1 className="mt-2 text-3xl font-black text-slate-900">Customer Dashboard</h1>
           <p className="mt-1 text-slate-500">Book services, track requests, and review completed work.</p>
           {displayName && (
-            <p className="mt-3 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+              {user?.avatar && (
+                <img src={user.avatar} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
+              )}
               {displayName}
             </p>
           )}

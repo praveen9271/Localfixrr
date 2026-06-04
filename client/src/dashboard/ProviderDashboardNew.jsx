@@ -13,6 +13,7 @@ import {
   updateBookingStatus,
   updateProviderProfile,
   updateService,
+  uploadImage,
   getProviderReviews,
 } from '../services/dashboardService'
 import Alert from '../components/ui/Alert'
@@ -35,6 +36,7 @@ const blankService = {
   price: '',
   location: '',
   description: '',
+  image: '',
   status: 'active',
 }
 
@@ -44,6 +46,7 @@ const serviceSchema = Yup.object({
   price: Yup.number().typeError('Enter a valid price.').min(0, 'Price cannot be negative.').required('Price is required.'),
   location: Yup.string().trim().max(120, 'Location is too long.'),
   description: Yup.string().trim().min(10, 'Description must be at least 10 characters.').required('Description is required.'),
+  image: Yup.string().url('Image must be a valid URL.'),
   status: Yup.string().oneOf(['active', 'inactive']).required('Status is required.'),
 })
 
@@ -52,6 +55,7 @@ const providerProfileSchema = Yup.object({
   bio: Yup.string().trim().max(600, 'Bio must be 600 characters or less.'),
   serviceAreas: Yup.string().trim().required('Service areas are required.'),
   skills: Yup.string().required('Service work is required.'),
+  avatar: Yup.string().url('Profile image must be a valid URL.'),
   available: Yup.boolean(),
 })
 
@@ -129,18 +133,25 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   })
 
   const profileFormik = useFormik({
-    initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', available: true },
+    initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', avatar: '', available: true },
     validationSchema: providerProfileSchema,
     onSubmit: async (values) => {
       setSaving(true)
       try {
-        await updateProviderProfile({
+        const response = await updateProviderProfile({
           businessName: values.businessName,
           bio: values.bio,
           serviceAreas: values.serviceAreas.split(',').map((item) => item.trim()).filter(Boolean),
           skills: values.skills ? [values.skills] : [],
+          avatar: values.avatar,
           available: values.available,
         })
+        const updatedAvatar = response.provider?.user?.avatar || values.avatar
+        const storedUser = getCurrentUser()
+        if (storedUser) {
+          localStorage.setItem('user', JSON.stringify({ ...storedUser, avatar: updatedAvatar }))
+          window.dispatchEvent(new Event('localfixr:user-updated'))
+        }
         showToast('Profile updated')
         await loadDashboard()
       } catch (err) {
@@ -172,6 +183,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
         bio: nextProfile?.bio || '',
         serviceAreas: (nextProfile?.serviceAreas || []).join(', '),
         skills: (nextProfile?.skills || []).join(', '),
+        avatar: nextProfile?.user?.avatar || '',
         available: Boolean(nextProfile?.available),
       })
     } catch (err) {
@@ -205,6 +217,40 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     setEditingId(null)
   }
 
+  const handleServiceImageUpload = async (event) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+
+    setSaving(true)
+    try {
+      const data = await uploadImage(file, 'services')
+      serviceFormik.setFieldValue('image', data.image?.optimizedUrl || data.image?.url || data.url || '')
+      showToast('Image uploaded')
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Unable to upload image')
+    } finally {
+      event.currentTarget.value = ''
+      setSaving(false)
+    }
+  }
+
+  const handleProviderAvatarUpload = async (event) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+
+    setSaving(true)
+    try {
+      const data = await uploadImage(file, 'avatars')
+      profileFormik.setFieldValue('avatar', data.image?.optimizedUrl || data.image?.url || data.url || '')
+      showToast('Profile image uploaded')
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Unable to upload profile image')
+    } finally {
+      event.currentTarget.value = ''
+      setSaving(false)
+    }
+  }
+
   const startEdit = (service) => {
     setEditingId(service._id)
     serviceFormik.setValues({
@@ -213,6 +259,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       price: service.price || '',
       location: service.location || '',
       description: service.description || '',
+      image: service.image || '',
       status: service.status || 'active',
     })
     navigate('/dashboard/provider/services')
@@ -272,11 +319,14 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider Panel</p>
         <h1 className="mt-2 text-3xl font-black text-slate-900">Service Provider Dashboard</h1>
         <p className="mt-1 text-slate-500">Manage services, booking requests, earnings, and reviews.</p>
         {displayName && (
-          <p className="mt-3 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+          <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
+            {(profile?.user?.avatar || user?.avatar) && (
+              <img src={profile?.user?.avatar || user?.avatar} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
+            )}
             {displayName}
           </p>
         )}
@@ -433,6 +483,32 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
               </select>
             </label>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
+              Service Image
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={handleServiceImageUpload}
+                disabled={saving}
+                className="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
+              />
+            </label>
+            {serviceFormik.values.image && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                <img
+                  src={serviceFormik.values.image}
+                  alt="Service preview"
+                  className="h-36 w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => serviceFormik.setFieldValue('image', '')}
+                  className="w-full bg-slate-50 px-3 py-2 text-left text-xs font-bold text-rose-600 transition hover:bg-rose-50"
+                >
+                  Remove image
+                </button>
+              </div>
+            )}
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
               Description <span className="text-rose-500">*</span>
               <textarea
                 name="description"
@@ -464,6 +540,14 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
               {services.map((service) => (
                 <article key={service._id} className="rounded-lg border border-slate-200 p-4 hover:shadow-md transition">
+                  {service.image && (
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      className="mb-4 h-32 w-full rounded-lg object-cover"
+                      loading="lazy"
+                    />
+                  )}
                   <div className="flex justify-between gap-4">
                     <div>
                       <h3 className="font-bold text-slate-900">{service.title}</h3>
@@ -528,6 +612,35 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
         <div className="max-w-3xl space-y-6">
           <form onSubmit={profileFormik.handleSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-black text-slate-900">Provider Profile</h2>
+            <div className="mt-5 flex flex-col gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center">
+              {profileFormik.values.avatar ? (
+                <img
+                  src={profileFormik.values.avatar}
+                  alt={profileFormik.values.businessName || 'Provider profile'}
+                  className="h-20 w-20 rounded-full object-cover ring-4 ring-white"
+                />
+              ) : (
+                <div className="grid h-20 w-20 place-items-center rounded-full bg-slate-900 text-2xl font-black text-white ring-4 ring-white">
+                  {(profileFormik.values.businessName || user?.name || 'P').slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-slate-900">Profile Image</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Shown in your dashboard account menu after login.</p>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleProviderAvatarUpload}
+                  disabled={saving}
+                  className="mt-3 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
+                />
+              </div>
+              {profileFormik.values.avatar && (
+                <Button type="button" variant="secondary" onClick={() => profileFormik.setFieldValue('avatar', '')} disabled={saving}>
+                  Remove
+                </Button>
+              )}
+            </div>
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <FormField
                 name="businessName"
