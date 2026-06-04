@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
-import { getProfile } from '../services/authService'
-import { updateUserProfile, changeUserPassword, uploadImage } from '../services/dashboardService'
+import { getProfile, syncCurrentUser } from '../services/authService'
+import { updateUserProfile, changeUserPassword } from '../services/dashboardService'
+import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
 import DeleteAccountPanel from '../components/account/DeleteAccountPanel'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import Toast from '../components/ui/Toast'
 import LoadingGrid from '../components/ui/LoadingGrid'
+import ProfilePhotoPanel from '../components/profile/ProfilePhotoPanel'
 
 const profileSchema = Yup.object({
   name: Yup.string().trim().min(2, 'Enter your full name.').required('Full name is required.'),
@@ -15,7 +17,6 @@ const profileSchema = Yup.object({
     .matches(/^\d{10}$/, 'Enter a valid 10-digit mobile number.')
     .required('Phone number is required.'),
   address: Yup.string().trim().min(5, 'Enter your complete address.').required('Address is required.'),
-  avatar: Yup.string().url('Profile image must be a valid URL.'),
 })
 
 const passwordSchema = Yup.object({
@@ -44,18 +45,36 @@ function UserProfile() {
     setTimeout(() => setToast(''), 3000)
   }
 
+  const {
+    currentUser: profileUser,
+    setCurrentUser: setProfileUser,
+    saveProfilePhoto,
+    removeCurrentProfilePhoto,
+  } = useProfilePhotoActions({
+    onSuccess: (message) => {
+      setError('')
+      showToast(message)
+    },
+    onError: setError,
+  })
+
   const profileFormik = useFormik({
-    initialValues: { name: '', phone: '', address: '', avatar: '' },
+    initialValues: { name: '', phone: '', address: '' },
     validationSchema: profileSchema,
-    onSubmit: async (values) => {
+    onSubmit: async (values, { setValues }) => {
       setSaving(true)
       setError('')
       try {
-        await updateUserProfile(values)
-        const refreshed = await getProfile()
-        const u = refreshed.user || refreshed
-        localStorage.setItem('user', JSON.stringify(u))
-        window.dispatchEvent(new Event('localfixr:user-updated'))
+        const response = await updateUserProfile(values)
+        const u = response.user || response
+        setValues({
+          name: u.name || '',
+          phone: u.phone || '',
+          address: u.address || '',
+        })
+        setUserRole(u.role || '')
+        setProfileUser(u)
+        syncCurrentUser(u)
         showToast('Profile updated successfully')
       } catch (err) {
         setError(err.response?.data?.message || 'Unable to update profile')
@@ -90,11 +109,11 @@ function UserProfile() {
     try {
       const data = await getProfile()
       const u = data.user || data
+      setProfileUser(u)
       setProfileValues({
         name: u.name || '',
         phone: u.phone || '',
         address: u.address || '',
-        avatar: u.avatar || '',
       })
       setUserRole(u.role || '')
     } catch (err) {
@@ -102,7 +121,7 @@ function UserProfile() {
     } finally {
       setLoading(false)
     }
-  }, [setProfileValues])
+  }, [setProfileUser, setProfileValues])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -110,24 +129,6 @@ function UserProfile() {
     }, 0)
     return () => clearTimeout(timer)
   }, [loadProfile])
-
-  const handleAvatarUpload = async (event) => {
-    const file = event.currentTarget.files?.[0]
-    if (!file) return
-
-    setSaving(true)
-    setError('')
-    try {
-      const data = await uploadImage(file, 'avatars')
-      profileFormik.setFieldValue('avatar', data.image?.optimizedUrl || data.image?.url || data.url || '')
-      showToast('Profile image uploaded')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Unable to upload profile image')
-    } finally {
-      event.currentTarget.value = ''
-      setSaving(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -168,36 +169,16 @@ function UserProfile() {
       </div>
 
       {activeTab === 'profile' && (
-        <form onSubmit={profileFormik.handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-          <div className="flex flex-col gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center">
-            {profileFormik.values.avatar ? (
-              <img
-                src={profileFormik.values.avatar}
-                alt={profileFormik.values.name || 'Profile'}
-                className="h-20 w-20 rounded-full object-cover ring-4 ring-white"
-              />
-            ) : (
-              <div className="grid h-20 w-20 place-items-center rounded-full bg-slate-900 text-2xl font-black text-white ring-4 ring-white">
-                {(profileFormik.values.name || 'U').slice(0, 1).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-slate-900">Profile Image</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Upload a JPG, PNG, WEBP, or GIF image.</p>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                onChange={handleAvatarUpload}
-                disabled={saving}
-                className="mt-3 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
-              />
-            </div>
-            {profileFormik.values.avatar && (
-              <Button type="button" variant="secondary" onClick={() => profileFormik.setFieldValue('avatar', '')} disabled={saving}>
-                Remove
-              </Button>
-            )}
-          </div>
+        <>
+          <ProfilePhotoPanel
+            user={profileUser}
+            heading="Customer Profile"
+            subheading="Your photo appears across bookings, reviews, and account navigation."
+            onSavePhoto={saveProfilePhoto}
+            onRemovePhoto={removeCurrentProfilePhoto}
+            disabled={saving}
+          />
+          <form onSubmit={profileFormik.handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <label className="block text-sm font-semibold text-slate-700">
               Full Name <span className="text-rose-500">*</span>
@@ -264,7 +245,8 @@ function UserProfile() {
           <div className="pt-2">
             <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
           </div>
-        </form>
+          </form>
+        </>
       )}
 
       {activeTab === 'password' && (

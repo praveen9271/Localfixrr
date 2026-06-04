@@ -9,7 +9,7 @@ import { buildPagination, getPagination } from '../utils/pagination.js';
 const populateServiceProvider = {
   path: 'provider',
   select: 'businessName available rating reviewsCount serviceAreas user',
-  populate: { path: 'user', select: 'name email phone address' },
+  populate: { path: 'user', select: 'name email phone address avatar' },
 };
 
 const categoryAliases = {
@@ -362,7 +362,7 @@ const createReview = async (req, res) => {
     });
 
     await recalculateRatings(booking.service, booking.provider);
-    await review.populate('user', 'name');
+    await review.populate('user', 'name avatar');
 
     res.status(201).json({ success: true, message: 'Review submitted successfully', review });
   } catch (error) {
@@ -391,7 +391,7 @@ const getServiceReviews = async (req, res) => {
       Review.countDocuments(query),
       Review.find(query)
         .select('user provider booking service rating comment createdAt')
-        .populate('user', 'name')
+        .populate('user', 'name avatar')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

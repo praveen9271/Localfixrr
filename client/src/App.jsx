@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormik } from 'formik'
-import { Eye, EyeOff } from 'lucide-react'
+import { Camera, Eye, EyeOff, X } from 'lucide-react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import * as Yup from 'yup'
 import Footer from './component/Footer'
@@ -19,8 +19,10 @@ import {
   persistSession,
   resendRegistrationOtp,
   startRegistration,
+  updateProfilePhoto,
   verifyEmailOtp,
 } from './services/authService'
+import ProfileAvatar from './components/profile/ProfileAvatar'
 import { button3d, button3dSubtle, darkAppShell, lightAppShell } from './utils/tailwindStyles'
 
 const Home = lazy(() => import('./Pages/Home'))
@@ -373,7 +375,13 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
   const [registrationSession, setRegistrationSession] = useState(null)
   const [loading, setLoading] = useState(false)
   const [resendSecondsLeft, setResendSecondsLeft] = useState(0)
+  const [registrationPhotoFile, setRegistrationPhotoFile] = useState(null)
+  const registrationPhotoInputRef = useRef(null)
   const navigate = useNavigate()
+  const registrationPhotoPreview = useMemo(
+    () => (registrationPhotoFile ? URL.createObjectURL(registrationPhotoFile) : ''),
+    [registrationPhotoFile],
+  )
 
   const buildRegistrationPayload = (values) => ({
     name: values.name.trim(),
@@ -431,6 +439,15 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
         onToast(verifyResponse.message)
         const response = await completeRegistration(registrationSession)
         persistSession(response)
+        if (registrationPhotoFile) {
+          try {
+            const photoResponse = await updateProfilePhoto(registrationPhotoFile)
+            persistSession({ user: photoResponse.user })
+            onToast(photoResponse.message || 'Profile photo saved')
+          } catch (photoError) {
+            onToast(photoError.response?.data?.message || 'Account created, but profile photo could not be saved')
+          }
+        }
         setStep('success')
         onToast(response.message)
         setTimeout(() => {
@@ -456,6 +473,11 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
     return () => clearInterval(timer)
   }, [isOpen, step, resendSecondsLeft])
 
+  useEffect(() => {
+    if (!registrationPhotoPreview) return undefined
+    return () => URL.revokeObjectURL(registrationPhotoPreview)
+  }, [registrationPhotoPreview])
+
   if (!isOpen) return null
 
   const phoneDigits = registerFormik.values.phone.replace(/\D/g, '').slice(0, 10)
@@ -469,8 +491,16 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
     setShowPassword(false)
     setShowConfirmPassword(false)
     setRegistrationSession(null)
+    setRegistrationPhotoFile(null)
     setResendSecondsLeft(0)
     setStep('details')
+  }
+
+  const handleRegistrationPhotoChange = (event) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+    setRegistrationPhotoFile(file)
   }
 
   const handleClose = () => {
@@ -624,6 +654,56 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
           >
             Close
           </button>
+        </div>
+
+        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <button
+            type="button"
+            onClick={() => registrationPhotoInputRef.current?.click()}
+            className="group relative h-16 w-16 shrink-0 rounded-full focus:outline-none focus:ring-4 focus:ring-indigo-100"
+            aria-label={registrationPhotoFile ? 'Change profile photo' : 'Add optional profile photo'}
+          >
+            <ProfileAvatar
+              src={registrationPhotoPreview}
+              name={registerFormik.values.name}
+              email={registerFormik.values.email}
+              size="md"
+              className="h-16 w-16 border-2 border-white shadow-sm"
+            />
+            <span className="absolute inset-0 grid place-items-center rounded-full bg-slate-950/0 text-white opacity-0 transition group-hover:bg-slate-950/45 group-hover:opacity-100">
+              <Camera className="h-4 w-4" />
+            </span>
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-slate-900">Profile photo</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                ref={registrationPhotoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleRegistrationPhotoChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => registrationPhotoInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                {registrationPhotoFile ? 'Change Photo' : 'Add Photo'}
+              </button>
+              {registrationPhotoFile && (
+                <button
+                  type="button"
+                  onClick={() => setRegistrationPhotoFile(null)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <label className="mt-6 block">

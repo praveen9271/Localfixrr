@@ -29,6 +29,12 @@ export const persistSession = ({ token, user }) => {
   if (user) writeStorage('user', JSON.stringify(user));
 };
 
+export const syncCurrentUser = (user) => {
+  if (!user) return;
+  writeStorage('user', JSON.stringify(user));
+  window.dispatchEvent(new Event('localfixr:user-updated'));
+};
+
 // Register user
 export const register = async (userData) => {
   const response = await api.post('/auth/register', userData);
@@ -84,6 +90,22 @@ export const loginWithGoogle = async (credential) => {
 // Get user profile
 export const getProfile = async () => {
   const response = await api.get('/auth/me');
+  return response.data;
+};
+
+export const updateProfilePhoto = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const response = await api.put('/auth/profile/photo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  });
+  return response.data;
+};
+
+export const removeProfilePhoto = async () => {
+  const response = await api.delete('/auth/profile/photo');
   return response.data;
 };
 

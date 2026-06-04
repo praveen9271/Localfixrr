@@ -6,6 +6,7 @@ import { createBooking, getPublicServiceDetails, getServiceReviews } from '../se
 import { getCurrentUser, isAuthenticated, isUser } from '../services/authService'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
+import ProfileAvatar from '../components/profile/ProfileAvatar'
 import useProtectedBooking from '../hooks/useProtectedBooking'
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`
@@ -213,7 +214,10 @@ function ProviderDetails() {
           {reviews.map((review) => (
             <article key={review._id} className="rounded-lg bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <p className="font-bold text-slate-900">{review.user?.name || 'Customer'}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <ProfileAvatar src={review.user?.avatar} name={review.user?.name} size="sm" />
+                  <p className="truncate font-bold text-slate-900">{review.user?.name || 'Customer'}</p>
+                </div>
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">{review.rating}/5</span>
               </div>
               <p className="mt-3 text-sm leading-7 text-slate-600">{review.comment}</p>

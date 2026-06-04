@@ -1,6 +1,6 @@
 import multer from 'multer';
 
-const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
@@ -14,7 +14,7 @@ const imageUpload = multer({
       return;
     }
 
-    const error = new Error('Only JPG, PNG, WEBP, and GIF images are allowed');
+    const error = new Error('Only JPG, JPEG, PNG, and WEBP images are allowed');
     error.statusCode = 400;
     callback(error);
   },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getPublicServices, getServiceReviews } from '../services/dashboardService'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import EmptyState from '../components/ui/EmptyState'
+import ProfileAvatar from '../components/profile/ProfileAvatar'
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -89,9 +90,7 @@ function Reviews() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-indigo-100 font-bold text-indigo-600">
-                  {(review.user?.name || 'U').charAt(0).toUpperCase()}
-                </div>
+                <ProfileAvatar src={review.user?.avatar} name={review.user?.name} size="sm" />
                 <div>
                   <h3 className="font-semibold text-slate-900">
                     {review.user?.name || 'Anonymous'}

@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { normalizeServiceCategory } from '../config/serviceCategories.js';
+import { uploadImageFile } from '../services/imageUploadService.js';
 import {
   OTP_MAX_ATTEMPTS,
   OTP_MAX_RESENDS,
@@ -799,7 +800,7 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone, address, avatar } = req.body;
+    const { name, phone, address } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -807,7 +808,6 @@ const updateProfile = async (req, res) => {
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
-    if (avatar !== undefined) user.avatar = avatar;
     await user.save();
     const provider = user.role === 'service_provider'
       ? await Provider.findOne({ user: user._id })
@@ -816,6 +816,68 @@ const updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update current user's profile photo
+// @route   PUT /api/auth/profile/photo
+// @access  Private
+const updateProfilePhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please upload a profile photo' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const image = await uploadImageFile(req.file, 'avatars');
+    user.avatar = image.optimizedUrl || image.url;
+    await user.save();
+
+    const provider = user.role === 'service_provider'
+      ? await Provider.findOne({ user: user._id })
+      : null;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo updated successfully',
+      image,
+      user: formatUser(user, provider),
+    });
+  } catch (error) {
+    console.error('Update profile photo error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to update profile photo', error: error.message });
+  }
+};
+
+// @desc    Remove current user's profile photo
+// @route   DELETE /api/auth/profile/photo
+// @access  Private
+const removeProfilePhoto = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.avatar = '';
+    await user.save();
+
+    const provider = user.role === 'service_provider'
+      ? await Provider.findOne({ user: user._id })
+      : null;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo removed successfully',
+      user: formatUser(user, provider),
+    });
+  } catch (error) {
+    console.error('Remove profile photo error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to remove profile photo', error: error.message });
   }
 };
 
@@ -936,7 +998,9 @@ export {
   loginUser,
   getMe,
   updateProfile,
+  updateProfilePhoto,
   changePassword,
+  removeProfilePhoto,
   forgotPassword,
   resetPassword,
   verifyResetOtp,

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
-import { getCurrentUser } from '../services/authService'
+import { syncCurrentUser } from '../services/authService'
 import {
   createService,
   deleteService,
@@ -16,6 +16,7 @@ import {
   uploadImage,
   getProviderReviews,
 } from '../services/dashboardService'
+import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import DeleteAccountPanel from '../components/account/DeleteAccountPanel'
@@ -27,6 +28,8 @@ import LoadingGrid from '../components/ui/LoadingGrid'
 import StatCard from '../components/ui/StatCard'
 import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
+import ProfileAvatar from '../components/profile/ProfileAvatar'
+import ProfilePhotoPanel from '../components/profile/ProfilePhotoPanel'
 import { formatCurrency, formatDateTime, formatStatus } from '../utils/formatters'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 
@@ -55,7 +58,6 @@ const providerProfileSchema = Yup.object({
   bio: Yup.string().trim().max(600, 'Bio must be 600 characters or less.'),
   serviceAreas: Yup.string().trim().required('Service areas are required.'),
   skills: Yup.string().required('Service work is required.'),
-  avatar: Yup.string().url('Profile image must be a valid URL.'),
   available: Yup.boolean(),
 })
 
@@ -67,23 +69,14 @@ const normalizeServiceIdentity = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-const toTitleCase = (value) =>
-  String(value || '')
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
-
 function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   const navigate = useNavigate()
-  const [user] = useState(getCurrentUser())
   const activeTab = defaultTab
   const [stats, setStats] = useState({})
   const [services, setServices] = useState([])
   const [bookings, setBookings] = useState([])
   const [reviews, setReviews] = useState([])
   const [profile, setProfile] = useState(null)
-  const displayName = toTitleCase(profile?.businessName || user?.name)
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -95,6 +88,21 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
   }
+
+  const {
+    currentUser: user,
+    saveProfilePhoto,
+    removeCurrentProfilePhoto,
+  } = useProfilePhotoActions({
+    onSuccess: (message, updatedUser) => {
+      setError('')
+      setProfile((current) => current
+        ? { ...current, user: { ...(current.user || {}), ...updatedUser } }
+        : current)
+      showToast(message)
+    },
+    onError: setError,
+  })
 
   const serviceFormik = useFormik({
     initialValues: blankService,
@@ -133,24 +141,40 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   })
 
   const profileFormik = useFormik({
-    initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', avatar: '', available: true },
+    initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', available: true },
     validationSchema: providerProfileSchema,
     onSubmit: async (values) => {
       setSaving(true)
+      setError('')
       try {
         const response = await updateProviderProfile({
           businessName: values.businessName,
           bio: values.bio,
           serviceAreas: values.serviceAreas.split(',').map((item) => item.trim()).filter(Boolean),
           skills: values.skills ? [values.skills] : [],
-          avatar: values.avatar,
           available: values.available,
         })
-        const updatedAvatar = response.provider?.user?.avatar || values.avatar
-        const storedUser = getCurrentUser()
-        if (storedUser) {
-          localStorage.setItem('user', JSON.stringify({ ...storedUser, avatar: updatedAvatar }))
-          window.dispatchEvent(new Event('localfixr:user-updated'))
+        const updatedProvider = response.provider
+        const providerUser = updatedProvider?.user
+        if (user) {
+          syncCurrentUser({
+            ...user,
+            name: providerUser?.name || user.name,
+            email: providerUser?.email || user.email,
+            phone: providerUser?.phone || user.phone,
+            address: providerUser?.address || user.address,
+            avatar: providerUser?.avatar || user.avatar || '',
+          })
+        }
+        if (updatedProvider) {
+          setProfile(updatedProvider)
+          providerProfileSetValuesRef.current({
+            businessName: updatedProvider.businessName || '',
+            bio: updatedProvider.bio || '',
+            serviceAreas: (updatedProvider.serviceAreas || []).join(', '),
+            skills: (updatedProvider.skills || []).join(', '),
+            available: Boolean(updatedProvider.available),
+          })
         }
         showToast('Profile updated')
         await loadDashboard()
@@ -161,7 +185,11 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       }
     },
   })
-  const { setValues: setProviderProfileValues } = profileFormik
+  const providerProfileSetValuesRef = useRef(profileFormik.setValues)
+
+  useEffect(() => {
+    providerProfileSetValuesRef.current = profileFormik.setValues
+  }, [profileFormik.setValues])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -178,12 +206,11 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       setBookings(bookingsData.bookings || [])
       const nextProfile = profileData.provider
       setProfile(nextProfile)
-      setProviderProfileValues({
+      providerProfileSetValuesRef.current({
         businessName: nextProfile?.businessName || '',
         bio: nextProfile?.bio || '',
         serviceAreas: (nextProfile?.serviceAreas || []).join(', '),
         skills: (nextProfile?.skills || []).join(', '),
-        avatar: nextProfile?.user?.avatar || '',
         available: Boolean(nextProfile?.available),
       })
     } catch (err) {
@@ -191,7 +218,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     } finally {
       setLoading(false)
     }
-  }, [setProviderProfileValues])
+  }, [])
 
   const loadReviews = useCallback(async () => {
     try {
@@ -218,7 +245,8 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   }
 
   const handleServiceImageUpload = async (event) => {
-    const file = event.currentTarget.files?.[0]
+    const input = event.currentTarget
+    const file = input?.files?.[0]
     if (!file) return
 
     setSaving(true)
@@ -229,24 +257,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     } catch (err) {
       showToast(err.response?.data?.message || 'Unable to upload image')
     } finally {
-      event.currentTarget.value = ''
-      setSaving(false)
-    }
-  }
-
-  const handleProviderAvatarUpload = async (event) => {
-    const file = event.currentTarget.files?.[0]
-    if (!file) return
-
-    setSaving(true)
-    try {
-      const data = await uploadImage(file, 'avatars')
-      profileFormik.setFieldValue('avatar', data.image?.optimizedUrl || data.image?.url || data.url || '')
-      showToast('Profile image uploaded')
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Unable to upload profile image')
-    } finally {
-      event.currentTarget.value = ''
+      if (input) input.value = ''
       setSaving(false)
     }
   }
@@ -322,14 +333,6 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider Panel</p>
         <h1 className="mt-2 text-3xl font-black text-slate-900">Service Provider Dashboard</h1>
         <p className="mt-1 text-slate-500">Manage services, booking requests, earnings, and reviews.</p>
-        {displayName && (
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
-            {(profile?.user?.avatar || user?.avatar) && (
-              <img src={profile?.user?.avatar || user?.avatar} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
-            )}
-            {displayName}
-          </p>
-        )}
       </div>
 
       <Alert>{error}</Alert>
@@ -392,8 +395,13 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                 {bookings.map((booking) => (
                   <tr key={booking._id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="py-3 pr-4">
-                      <p className="font-semibold text-slate-900">{booking.customer?.name}</p>
-                      <p className="text-xs text-slate-500">{booking.customer?.phone}</p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <ProfileAvatar src={booking.customer?.avatar} name={booking.customer?.name} email={booking.customer?.email} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900">{booking.customer?.name}</p>
+                          <p className="truncate text-xs text-slate-500">{booking.customer?.phone}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3 pr-4 text-slate-600">{booking.service?.title}</td>
                     <td className="py-3 pr-4 text-slate-600">{formatDateTime(booking.date)}</td>
@@ -486,7 +494,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
               Service Image
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleServiceImageUpload}
                 disabled={saving}
                 className="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
@@ -591,7 +599,10 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-slate-900">{review.service?.title}</h3>
-                    <p className="mt-1 text-sm text-slate-500">By {review.user?.name}</p>
+                    <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                      <ProfileAvatar src={review.user?.avatar} name={review.user?.name} email={review.user?.email} size="xs" />
+                      <span>By {review.user?.name}</span>
+                    </div>
                   </div>
                   <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">{review.rating}/5</span>
                 </div>
@@ -610,37 +621,16 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
 
       {activeTab === 'profile' && (
         <div className="max-w-3xl space-y-6">
+          <ProfilePhotoPanel
+            user={{ ...user, avatar: profile?.user?.avatar || user?.avatar }}
+            onSavePhoto={saveProfilePhoto}
+            onRemovePhoto={removeCurrentProfilePhoto}
+            disabled={saving}
+            compact
+          />
+
           <form onSubmit={profileFormik.handleSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-black text-slate-900">Provider Profile</h2>
-            <div className="mt-5 flex flex-col gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center">
-              {profileFormik.values.avatar ? (
-                <img
-                  src={profileFormik.values.avatar}
-                  alt={profileFormik.values.businessName || 'Provider profile'}
-                  className="h-20 w-20 rounded-full object-cover ring-4 ring-white"
-                />
-              ) : (
-                <div className="grid h-20 w-20 place-items-center rounded-full bg-slate-900 text-2xl font-black text-white ring-4 ring-white">
-                  {(profileFormik.values.businessName || user?.name || 'P').slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-slate-900">Profile Image</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">Shown in your dashboard account menu after login.</p>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  onChange={handleProviderAvatarUpload}
-                  disabled={saving}
-                  className="mt-3 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
-                />
-              </div>
-              {profileFormik.values.avatar && (
-                <Button type="button" variant="secondary" onClick={() => profileFormik.setFieldValue('avatar', '')} disabled={saving}>
-                  Remove
-                </Button>
-              )}
-            </div>
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <FormField
                 name="businessName"

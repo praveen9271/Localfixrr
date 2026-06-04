@@ -26,7 +26,7 @@ const ensureProviderProfile = async (user) => {
 
 const populateProviderBooking = [
   { path: 'service', select: 'title category price location' },
-  { path: 'customer', select: 'name email phone address' },
+  { path: 'customer', select: 'name email phone address avatar' },
 ];
 
 const getDuplicateServiceQuery = ({ providerId, title, category, excludeId = null }) => {
@@ -370,7 +370,7 @@ const getProviderProfile = async (req, res) => {
 const updateProviderProfile = async (req, res) => {
   try {
     const provider = req.provider || await ensureProviderProfile(req.user);
-    const { businessName, bio, skills, serviceAreas, experienceYears, available, avatar } = req.body;
+    const { businessName, bio, skills, serviceAreas, experienceYears, available } = req.body;
 
     if (businessName !== undefined) provider.businessName = businessName;
     if (bio !== undefined) provider.bio = bio;
@@ -380,10 +380,8 @@ const updateProviderProfile = async (req, res) => {
     if (Array.isArray(serviceAreas)) provider.serviceAreas = serviceAreas;
     if (experienceYears !== undefined) provider.experienceYears = Number(experienceYears) || 0;
     if (available !== undefined) provider.available = Boolean(available);
-    if (avatar !== undefined) req.user.avatar = avatar;
 
     await provider.save();
-    if (avatar !== undefined) await req.user.save();
     await provider.populate('user', 'name email phone address avatar');
     res.status(200).json({ success: true, message: 'Profile updated successfully', provider });
   } catch (error) {
@@ -404,7 +402,7 @@ const getProviderReviews = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const total = await Review.countDocuments({ provider: provider._id });
     const reviews = await Review.find({ provider: provider._id })
-      .populate('user', 'name email')
+      .populate('user', 'name email avatar')
       .populate('service', 'title')
       .sort({ createdAt: -1 })
       .skip(skip)

@@ -18,6 +18,7 @@ import {
 import StatusBadge from '../ui/StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import ProviderContactActions from './ProviderContactActions'
+import ProfileAvatar from '../profile/ProfileAvatar'
 
 const categoryIcons = [
   { match: ['electrical', 'electrician'], icon: Zap, color: 'bg-amber-50 text-amber-600 ring-amber-100' },
@@ -61,7 +62,6 @@ function ServiceListingCard({
   const menuRef = useRef(null)
   const category = service?.category || 'Service'
   const providerName = getProviderName(service)
-  const providerInitial = providerName.charAt(0).toUpperCase()
   const providerPerson = getProviderPerson(service)
   const { icon: ServiceIcon, color } = getCategoryIcon(category)
 
@@ -156,9 +156,7 @@ function ServiceListingCard({
       <div className="mt-5 rounded-xl bg-gradient-to-br from-indigo-50 to-sky-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-500">Service Provider</p>
         <div className="mt-3 flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-sm font-black text-indigo-600 shadow-sm">
-            {providerInitial}
-          </div>
+          <ProfileAvatar src={service?.provider?.user?.avatar} name={providerName} email={service?.provider?.user?.email} size="sm" className="bg-white shadow-sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-black text-slate-900">{providerName}</p>
             <p className="truncate text-sm text-slate-500">{providerPerson}</p>

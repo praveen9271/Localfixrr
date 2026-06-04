@@ -11,7 +11,6 @@ import {
   submitReview,
   getPublicServiceDetails,
 } from '../services/dashboardService'
-import { getCurrentUser } from '../services/authService'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import DraggableGrid from '../components/ui/DraggableGrid'
@@ -22,20 +21,15 @@ import StatCard from '../components/ui/StatCard'
 import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
 import ServiceListingCard from '../components/services/ServiceListingCard'
+import ProfileAvatar from '../components/profile/ProfileAvatar'
 import { formatCurrency, formatDate } from '../utils/formatters'
 import { SERVICE_CATEGORY_OPTIONS } from '../constants/serviceCategories'
 import useDebounce from '../hooks/useDebounce'
+import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
 
 const CATEGORIES = SERVICE_CATEGORY_OPTIONS
 const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
-
-const toTitleCase = (value) =>
-  String(value || '')
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
 
 const bookingSchema = Yup.object({
   date: Yup.string().required('Preferred date and time is required.'),
@@ -50,8 +44,6 @@ const reviewSchema = Yup.object({
 
 function UserDashboardNew({ defaultTab = 'dashboard' }) {
   const navigate = useNavigate()
-  const [user] = useState(getCurrentUser())
-  const displayName = toTitleCase(user?.name)
   const activeTab = defaultTab
   const [stats, setStats] = useState({})
   const [services, setServices] = useState([])
@@ -77,6 +69,10 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
   }
+
+  const {
+    currentUser: user,
+  } = useProfilePhotoActions()
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -264,14 +260,6 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Customer Panel</p>
           <h1 className="mt-2 text-3xl font-black text-slate-900">Customer Dashboard</h1>
           <p className="mt-1 text-slate-500">Book services, track requests, and review completed work.</p>
-          {displayName && (
-            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 ring-1 ring-indigo-100">
-              {user?.avatar && (
-                <img src={user.avatar} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
-              )}
-              {displayName}
-            </p>
-          )}
         </div>
       </div>
 
@@ -326,7 +314,17 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                   {bookings.slice(0, 5).map((booking) => (
                     <tr key={booking._id} className="border-b border-slate-100">
                       <td className="py-3 pr-4 font-semibold text-slate-900">{booking.service?.title}</td>
-                      <td className="py-3 pr-4 text-slate-600">{booking.provider?.businessName || booking.provider?.user?.name}</td>
+                      <td className="py-3 pr-4 text-slate-600">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ProfileAvatar
+                            src={booking.provider?.user?.avatar}
+                            name={booking.provider?.businessName || booking.provider?.user?.name}
+                            email={booking.provider?.user?.email}
+                            size="sm"
+                          />
+                          <span className="truncate">{booking.provider?.businessName || booking.provider?.user?.name}</span>
+                        </div>
+                      </td>
                       <td className="py-3 pr-4 text-slate-600">{formatDate(booking.date)}</td>
                       <td className="py-3 pr-4"><StatusBadge status={booking.status} /></td>
                     </tr>
@@ -473,7 +471,17 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 {bookings.map((booking) => (
                   <tr key={booking._id} className="border-b border-slate-100">
                     <td className="py-3 pr-4 font-semibold text-slate-900">{booking.service?.title}</td>
-                    <td className="py-3 pr-4 text-slate-600">{booking.provider?.businessName || booking.provider?.user?.name}</td>
+                    <td className="py-3 pr-4 text-slate-600">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <ProfileAvatar
+                          src={booking.provider?.user?.avatar}
+                          name={booking.provider?.businessName || booking.provider?.user?.name}
+                          email={booking.provider?.user?.email}
+                          size="sm"
+                        />
+                        <span className="truncate">{booking.provider?.businessName || booking.provider?.user?.name}</span>
+                      </div>
+                    </td>
                     <td className="py-3 pr-4 text-slate-600">{formatDate(booking.date)}</td>
                     <td className="py-3 pr-4 text-slate-600">{formatCurrency(booking.totalAmount)}</td>
                     <td className="py-3 pr-4"><StatusBadge status={booking.status} /></td>

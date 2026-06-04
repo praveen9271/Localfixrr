@@ -4,6 +4,7 @@ import { getCurrentUser, getUserRole, logout } from '../services/authService'
 import Icon from './Icon'
 import logo from '../assets/logo.png'
 import ConfirmModal from '../components/ui/ConfirmModal'
+import ProfileAvatar from '../components/profile/ProfileAvatar'
 
 const roleNavItems = {
   admin: [
@@ -197,17 +198,7 @@ const DashboardLayout = ({ children }) => {
                 <p className="max-w-40 truncate text-sm font-bold text-slate-900">{displayName}</p>
                 <p className="text-xs text-slate-500">{roleLabel}</p>
               </div>
-              {user?.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={displayName}
-                  className="h-10 w-10 rounded-full bg-slate-100 object-cover ring-1 ring-slate-200"
-                />
-              ) : (
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
-                  {displayName.slice(0, 1).toUpperCase()}
-                </div>
-              )}
+              <ProfileAvatar src={user?.avatar} name={displayName} email={user?.email} size="sm" />
             </button>
 
             {profileMenuOpen && (
@@ -217,13 +208,7 @@ const DashboardLayout = ({ children }) => {
               >
                 <div className="border-b border-slate-100 px-3 py-3">
                   <div className="flex items-center gap-3">
-                    {user?.avatar ? (
-                      <img src={user.avatar} alt={displayName} className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200" />
-                    ) : (
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-black text-white">
-                        {displayName.slice(0, 1).toUpperCase()}
-                      </div>
-                    )}
+                    <ProfileAvatar src={user?.avatar} name={displayName} email={user?.email} size="sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
                       <p className="truncate text-xs text-slate-500">{user?.email || 'Email Not Available'}</p>
