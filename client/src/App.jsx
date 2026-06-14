@@ -272,9 +272,11 @@ function LoginModal({ isOpen, onClose, onToast, onSwitchToRegister }) {
           <button
             type="button"
             onClick={onClose}
-            className={`${button3dSubtle} rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50`}
+            aria-label="Close login modal"
+            title="Close"
+            className={`${button3dSubtle} grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50`}
           >
-            Close
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -635,26 +637,29 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/55 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm">
       <form
         onSubmit={registerFormik.handleSubmit}
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[2rem] bg-white p-7 shadow-[0_30px_90px_rgba(15,23,42,0.35)]"
+        className="max-h-[90vh] w-full max-w-md overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)]"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-500">
-              LocalFixr
-            </p>
-            <h2 className="mt-2 text-3xl font-black text-slate-900">Create Account</h2>
+        <div className="modal-scroll max-h-[90vh] overflow-y-auto p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-500">
+                LocalFixr
+              </p>
+              <h2 className="mt-2 text-3xl font-black text-slate-900">Create Account</h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close create account modal"
+              title="Close"
+              className={`${button3dSubtle} grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50`}
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className={`${button3dSubtle} rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50`}
-          >
-            Close
-          </button>
-        </div>
 
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
           <button
@@ -954,6 +959,7 @@ function RegisterModal({ isOpen, onClose, onToast, onSwitchToLogin }) {
             Login
           </button>
         </p>
+        </div>
       </form>
     </div>
   )

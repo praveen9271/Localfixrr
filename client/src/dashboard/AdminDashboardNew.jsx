@@ -63,6 +63,7 @@ import {
   getAllUsers,
   updateAdminBookingStatus,
   updateAdminCategory,
+  updateAdminServiceItems,
   updateProviderStatus,
   updateUser,
 } from '../services/dashboardService'
@@ -76,6 +77,7 @@ import Toast from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../utils/formatters'
 import useDebounce from '../hooks/useDebounce'
 import usePagination from '../hooks/usePagination'
+import { getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
 
 const tabs = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard/admin', icon: LayoutDashboard },
@@ -89,6 +91,8 @@ const tabs = [
   { key: 'notifications', label: 'Notifications', path: '/dashboard/admin/notifications', icon: Bell },
   { key: 'settings', label: 'Settings', path: '/dashboard/admin/settings', icon: Settings },
 ]
+
+const visibleTabs = tabs.filter((tab) => tab.key !== 'settings')
 
 const bookingStatuses = ['pending', 'confirmed', 'accepted', 'in_progress', 'completed', 'cancelled', 'rejected']
 const statusTone = {
@@ -181,7 +185,7 @@ function KpiCard({ icon: Icon, label, value, hint, color, onClick }) {
 
 function DataTable({ columns, rows, emptyTitle, rowKey, loading = false }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="scrollbar-on-hover overflow-x-auto overscroll-x-contain">
       <table className="min-w-full text-left text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
@@ -245,7 +249,8 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger' })
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'Wrench', description: '', isActive: true })
   const [notificationForm, setNotificationForm] = useState({ title: '', message: '', type: 'info' })
-  const { pagination, setLimit, setPage, setPagination } = usePagination(5)
+  const [serviceItemEditor, setServiceItemEditor] = useState({ open: false, service: null, items: [] })
+  const { pagination, setLimit, setPage, setPagination } = usePagination(10)
   const tableFilterKeyRef = useRef('')
 
   const stats = statsPayload.stats || {}
@@ -362,6 +367,50 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
     })
   }
 
+  const openServiceItemEditor = (service) => {
+    setServiceItemEditor({
+      open: true,
+      service,
+      items: getServiceItems(service).map((item) => ({
+        name: item.name || '',
+        price: item.price || '',
+        description: item.description || '',
+        duration: item.duration || '',
+      })),
+    })
+  }
+
+  const setAdminServiceItemField = (index, field, value) => {
+    setServiceItemEditor((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
+    }))
+  }
+
+  const addAdminServiceItem = () => {
+    setServiceItemEditor((current) => ({
+      ...current,
+      items: [...current.items, makeBlankServiceItem()],
+    }))
+  }
+
+  const removeAdminServiceItem = (index) => {
+    setServiceItemEditor((current) => {
+      const items = current.items.filter((_, itemIndex) => itemIndex !== index)
+      return { ...current, items: items.length ? items : [makeBlankServiceItem()] }
+    })
+  }
+
+  const saveAdminServiceItems = async () => {
+    if (!serviceItemEditor.service) return
+    const items = serviceItemEditor.items.map((item) => ({ ...item, price: Number(item.price) }))
+    await runAction(
+      () => updateAdminServiceItems(serviceItemEditor.service._id, items),
+      'Service items updated',
+    )
+    setServiceItemEditor({ open: false, service: null, items: [] })
+  }
+
   const exportUsers = async () => {
     try {
       const blob = await exportAdminUsersCsv()
@@ -455,8 +504,8 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
 
         <Alert>{error}</Alert>
 
-        <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-          {tabs.map((tab) => {
+        <div className="grid grid-cols-9 gap-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.key
             return (
@@ -464,10 +513,10 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 key={tab.key}
                 type="button"
                 onClick={() => navigate(tab.path)}
-                className={cx('inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition', active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}
+                className={cx('inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[11px] font-bold transition xl:gap-1.5 xl:text-xs', active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}
               >
-                <Icon className="h-4 w-4" />
-                {tab.label}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="whitespace-nowrap">{tab.label}</span>
               </button>
             )
           })}
@@ -614,7 +663,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                   rowKey={(booking) => booking._id}
                   emptyTitle="No bookings yet"
                   columns={[
-                    { key: 'service', label: 'Service', render: (booking) => <span className="font-bold text-slate-950">{booking.service?.title || '-'}</span> },
+                    { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}</div> },
                     { key: 'customer', label: 'Customer', render: (booking) => booking.customer?.name || '-' },
                     { key: 'amount', label: 'Amount', render: (booking) => formatCurrency(booking.totalAmount) },
                     { key: 'status', label: 'Status', render: (booking) => <Badge status={booking.status} /> },
@@ -735,9 +784,26 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'title', label: 'Service', render: (service) => <span className="font-bold text-slate-950">{service.title}</span> },
                 { key: 'category', label: 'Category' },
                 { key: 'provider', label: 'Provider', render: (service) => service.provider?.businessName || service.provider?.user?.name || '-' },
-                { key: 'price', label: 'Price', render: (service) => formatCurrency(service.price) },
+                { key: 'price', label: 'Starting Price', render: (service) => formatCurrency(service.price) },
+                { key: 'items', label: 'Items', render: (service) => <span className="font-bold text-slate-700">{getServiceItems(service).length}</span> },
                 { key: 'status', label: 'Status', render: (service) => <Badge status={service.status} /> },
-                { key: 'actions', label: 'Actions', render: (service) => <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteAdminService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
+                {
+                  key: 'actions',
+                  label: 'Actions',
+                  render: (service) => (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => openServiceItemEditor(service)}
+                        className="h-9 rounded-lg border border-indigo-200 px-3 text-xs font-black text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        Manage Items
+                      </button>
+                      <IconButton title="Delete service" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete service', `Delete ${service.title}? This will permanently remove the service, its bookings, and its reviews from the database.`, () => deleteAdminService(service._id), 'Service and related records deleted')}><Trash2 className="h-4 w-4" /></IconButton>
+                    </div>
+                  ),
+                },
               ]}
             />
             <Pagination
@@ -809,7 +875,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
               loading={tableLoading}
               columns={[
                 { key: 'customer', label: 'Customer', render: (booking) => booking.customer?.name || '-' },
-                { key: 'service', label: 'Service', render: (booking) => <span className="font-bold text-slate-950">{booking.service?.title || '-'}</span> },
+                { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}</div> },
                 { key: 'provider', label: 'Provider', render: (booking) => booking.provider?.businessName || booking.provider?.user?.name || '-' },
                 { key: 'date', label: 'Date', render: (booking) => formatDate(booking.date) },
                 { key: 'amount', label: 'Amount', render: (booking) => formatCurrency(booking.totalAmount) },
@@ -965,6 +1031,89 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
               <h2 className="mt-3 text-lg font-black text-slate-950">Notifications</h2>
               <p className="mt-2 text-sm text-slate-500">{notifications.filter((item) => !item.isRead).length} unread notifications.</p>
             </button>
+          </div>
+        )}
+
+        {serviceItemEditor.open && (
+          <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">Service Items</p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950">{serviceItemEditor.service?.title}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setServiceItemEditor({ open: false, service: null, items: [] })}
+                  className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+                >
+                  x
+                </button>
+              </div>
+              <div className="modal-scroll max-h-[65vh] space-y-3 overflow-y-auto p-5">
+                {serviceItemEditor.items.map((item, index) => (
+                  <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+                      <input
+                        value={item.name}
+                        onChange={(event) => setAdminServiceItemField(index, 'name', event.target.value)}
+                        placeholder="Service item name"
+                        className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-300"
+                      />
+                      <input
+                        value={item.price}
+                        onChange={(event) => setAdminServiceItemField(index, 'price', event.target.value)}
+                        type="number"
+                        min="0"
+                        placeholder="Price"
+                        className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-300"
+                      />
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_9rem]">
+                      <input
+                        value={item.description}
+                        onChange={(event) => setAdminServiceItemField(index, 'description', event.target.value)}
+                        placeholder="Description"
+                        className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-300"
+                      />
+                      <input
+                        value={item.duration}
+                        onChange={(event) => setAdminServiceItemField(index, 'duration', event.target.value)}
+                        placeholder="Duration"
+                        className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-300"
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-end">
+                      <button type="button" onClick={() => removeAdminServiceItem(index)} className="text-xs font-black text-rose-600">Delete item</button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addAdminServiceItem}
+                  className="w-full rounded-xl border border-dashed border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-black text-indigo-700"
+                >
+                  Add Service Item
+                </button>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-slate-100 p-5">
+                <button
+                  type="button"
+                  onClick={() => setServiceItemEditor({ open: false, service: null, items: [] })}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={saveAdminServiceItems}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  Save Items
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -15,7 +15,7 @@ function DisabledContactButton({ children }) {
     <button
       type="button"
       disabled
-      className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-400"
+      className="inline-flex h-10 min-w-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-400 sm:gap-2 sm:px-3 sm:text-sm"
     >
       {children}
     </button>
@@ -24,12 +24,12 @@ function DisabledContactButton({ children }) {
 
 function ProviderContactActions({ phone, className = '', buttonClassName = '', compact = false }) {
   const digits = normalizeIndianPhone(phone)
-  const baseClass = `inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition ${buttonClassName}`
-  const labelClass = compact ? 'sr-only sm:not-sr-only' : ''
+  const baseClass = `inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold transition sm:gap-2 sm:px-3 sm:text-sm ${buttonClassName}`
+  const labelClass = compact ? 'truncate' : ''
 
   if (!digits) {
     return (
-      <div className={`grid gap-2 sm:grid-cols-3 ${className}`}>
+      <div className={`grid grid-cols-3 gap-2 ${className}`}>
         <DisabledContactButton><Phone className="h-4 w-4" /><span className={labelClass}>Call</span></DisabledContactButton>
         <DisabledContactButton><WhatsAppIcon /><span className={labelClass}>WhatsApp</span></DisabledContactButton>
         <DisabledContactButton><MessageCircle className="h-4 w-4" /><span className={labelClass}>Message</span></DisabledContactButton>
@@ -38,7 +38,7 @@ function ProviderContactActions({ phone, className = '', buttonClassName = '', c
   }
 
   return (
-    <div className={`grid gap-2 sm:grid-cols-3 ${className}`}>
+    <div className={`grid grid-cols-3 gap-2 ${className}`}>
       <a href={`tel:+91${digits}`} className={`${baseClass} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
         <Phone className="h-4 w-4" />
         <span className={labelClass}>Call</span>

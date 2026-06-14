@@ -14,6 +14,8 @@ import { SERVICE_AREA_FULL, isSupportedLocation, unsupportedLocationMessage } fr
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 import useDebounce from '../hooks/useDebounce'
 import useProtectedBooking from '../hooks/useProtectedBooking'
+import { getServiceItems } from '../utils/serviceItems'
+import { formatCurrency, getLocalDateTimeInputValue } from '../utils/formatters'
 
 const CATEGORY_OPTIONS = SERVICE_CATEGORIES
 
@@ -49,7 +51,9 @@ const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
 
 const bookingSchema = Yup.object({
-  date: Yup.string().required('Preferred date and time is required.'),
+  date: Yup.string()
+    .required('Preferred date and time is required.')
+    .test('future-date', 'Please select today or a future date and time.', (value) => !value || new Date(value) >= new Date()),
   address: Yup.string().trim().min(5, 'Enter a complete service address.').required('Address is required.'),
   notes: Yup.string().max(500, 'Notes must be 500 characters or less.'),
 })
@@ -206,7 +210,7 @@ function Services() {
   }
 
   const bookingFormik = useFormik({
-    initialValues: { date: '', address: getCurrentUser()?.address || '', notes: '' },
+    initialValues: { serviceItemId: '', date: '', address: getCurrentUser()?.address || '', notes: '' },
     validationSchema: bookingSchema,
     onSubmit: async (values, { resetForm }) => {
       if (!isAuthenticated()) {
@@ -221,12 +225,13 @@ function Services() {
       try {
         await createBooking({
           serviceId: bookingService._id,
+          serviceItemId: values.serviceItemId,
           date: values.date,
           address: values.address,
           notes: values.notes,
         })
         setBookingService(null)
-        resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+        resetForm({ values: { serviceItemId: '', date: '', address: getCurrentUser()?.address || '', notes: '' } })
         showToast('Booking request sent')
       } catch (err) {
         showToast(err.response?.data?.message || 'Booking failed')
@@ -351,7 +356,8 @@ function Services() {
               phone={getProviderPhone(service)}
               onBook={() => {
                 requestBooking(() => {
-                  bookingFormik.resetForm({ values: { date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                  const items = getServiceItems(service)
+                  bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: getCurrentUser()?.address || '', notes: '' } })
                   setBookingService(service)
                 })
               }}
@@ -399,11 +405,61 @@ function Services() {
 
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
           <form onSubmit={bookingFormik.handleSubmit}>
+            {bookingService && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-black text-slate-900">Choose service package</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Select one item. This exact service will be sent to the provider.</p>
+                <div className="mt-3 grid gap-2">
+                  {getServiceItems(bookingService).map((item) => {
+                    const itemKey = item._id || item.name
+                    const selected = bookingFormik.values.serviceItemId === itemKey
+                    return (
+                      <button
+                        key={itemKey}
+                        type="button"
+                        onClick={() => bookingFormik.setFieldValue('serviceItemId', itemKey)}
+                        className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${selected ? 'border-indigo-500 bg-white ring-4 ring-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          readOnly
+                          tabIndex={-1}
+                          className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-indigo-600"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-bold text-slate-900">{item.name}</p>
+                            <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-sm font-black text-indigo-700">{formatCurrency(item.price)}</span>
+                          </div>
+                          <div>
+                            {item.description && <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>}
+                            {item.duration && <p className="mt-1 text-xs font-semibold text-slate-400">{item.duration}</p>}
+                            {selected && <p className="mt-2 text-xs font-black text-indigo-600">Selected for booking</p>}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                  <span className="font-bold text-slate-600">Final amount</span>
+                  <span className="font-black text-slate-950">
+                    {formatCurrency(
+                      getServiceItems(bookingService).find((item) => (item._id || item.name) === bookingFormik.values.serviceItemId)?.price
+                        || getServiceItems(bookingService)[0]?.price
+                        || 0,
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
             <label className="mt-5 block text-sm font-semibold text-slate-700">
               Preferred date and time <span className="text-rose-500">*</span>
               <input
                 name="date"
                 type="datetime-local"
+                min={getLocalDateTimeInputValue()}
                 value={bookingFormik.values.date}
                 onChange={bookingFormik.handleChange}
                 onBlur={bookingFormik.handleBlur}

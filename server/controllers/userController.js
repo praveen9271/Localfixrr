@@ -5,6 +5,7 @@ import Provider from '../models/Provider.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 import { buildPagination, getPagination } from '../utils/pagination.js';
+import { getStartingPrice, sanitizeServiceItems } from '../utils/serviceItems.js';
 
 const populateServiceProvider = {
   path: 'provider',
@@ -32,6 +33,21 @@ const getCategoryValues = (category) => {
 };
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
+
+const withServiceItems = (service) => {
+  if (!service) return service;
+  const serviceItems = sanitizeServiceItems(service.serviceItems, {
+    category: service.category,
+    price: service.price,
+    title: service.title,
+  });
+
+  return {
+    ...service,
+    serviceItems,
+    price: getStartingPrice(serviceItems, service.price),
+  };
+};
 
 const recalculateRatings = async (serviceId, providerId) => {
   const [serviceRating] = await Review.aggregate([
@@ -99,7 +115,7 @@ const getAllServices = async (req, res) => {
     const [total, services] = await Promise.all([
       Service.countDocuments(query),
       Service.find(query)
-        .select('title description category price provider status location image rating reviewsCount createdAt')
+        .select('title description category price serviceItems provider status location image rating reviewsCount createdAt')
         .populate(populateServiceProvider)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -119,10 +135,10 @@ const getAllServices = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: services,
+      data: services.map(withServiceItems),
       count: services.length,
       pagination: buildPagination(page, limit, total),
-      services
+      services: services.map(withServiceItems)
     });
   } catch (error) {
     console.error('Get services error:', error);
@@ -140,7 +156,7 @@ const getServiceById = async (req, res) => {
     }
 
     const service = await Service.findById(req.params.id)
-      .select('title description category price provider status location image images duration rating reviewsCount createdAt')
+      .select('title description category price serviceItems provider status location image images duration rating reviewsCount createdAt')
       .populate(populateServiceProvider)
       .lean();
 
@@ -148,7 +164,7 @@ const getServiceById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Service not found' });
     }
 
-    res.status(200).json({ success: true, service });
+    res.status(200).json({ success: true, service: withServiceItems(service) });
   } catch (error) {
     console.error('Get service error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -160,7 +176,7 @@ const getServiceById = async (req, res) => {
 // @access  User
 const createBooking = async (req, res) => {
   try {
-    const { serviceId, date, notes, address } = req.body;
+    const { serviceId, serviceItemId, date, notes, address } = req.body;
     const cleanAddress = String(address || req.user?.address || '').trim();
     const cleanNotes = String(notes || '').trim();
 
@@ -212,6 +228,19 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Provider is not available for new bookings' });
     }
 
+    const serviceItems = sanitizeServiceItems(service.serviceItems, {
+      category: service.category,
+      price: service.price,
+      title: service.title,
+    });
+    const selectedItem = serviceItemId
+      ? serviceItems.find((item) => String(item._id) === String(serviceItemId) || item.name === serviceItemId)
+      : serviceItems[0];
+
+    if (!selectedItem) {
+      return res.status(400).json({ success: false, message: 'Please select a valid service item' });
+    }
+
     const booking = await Booking.create({
       service: serviceId,
       customer: req.user.id,
@@ -219,10 +248,17 @@ const createBooking = async (req, res) => {
       date: new Date(date),
       address: cleanAddress,
       notes: cleanNotes,
-      totalAmount: service.price
+      serviceItem: {
+        itemId: selectedItem._id,
+        name: selectedItem.name,
+        price: selectedItem.price,
+        description: selectedItem.description,
+        duration: selectedItem.duration,
+      },
+      totalAmount: selectedItem.price
     });
 
-    await booking.populate('service', 'title category price');
+    await booking.populate('service', 'title category price serviceItems');
     await booking.populate(populateServiceProvider);
 
     res.status(201).json({
@@ -244,7 +280,7 @@ const getMyBookings = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const total = await Booking.countDocuments({ customer: req.user.id });
     const bookings = await Booking.find({ customer: req.user.id })
-      .populate('service', 'title category price')
+      .populate('service', 'title category price serviceItems')
       .populate(populateServiceProvider)
       .sort({ createdAt: -1 })
       .skip(skip)

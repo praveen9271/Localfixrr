@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormik } from 'formik'
+import { CheckCircle2, Star } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
 import {
@@ -22,17 +23,20 @@ import StatusBadge from '../components/ui/StatusBadge'
 import Toast from '../components/ui/Toast'
 import ServiceListingCard from '../components/services/ServiceListingCard'
 import ProfileAvatar from '../components/profile/ProfileAvatar'
-import { formatCurrency, formatDate } from '../utils/formatters'
+import { formatCurrency, formatDate, getLocalDateTimeInputValue } from '../utils/formatters'
 import { SERVICE_CATEGORY_OPTIONS } from '../constants/serviceCategories'
 import useDebounce from '../hooks/useDebounce'
 import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
+import { getServiceItems, getStartingPrice } from '../utils/serviceItems'
 
 const CATEGORIES = SERVICE_CATEGORY_OPTIONS
 const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
 
 const bookingSchema = Yup.object({
-  date: Yup.string().required('Preferred date and time is required.'),
+  date: Yup.string()
+    .required('Preferred date and time is required.')
+    .test('future-date', 'Please select today or a future date and time.', (value) => !value || new Date(value) >= new Date()),
   address: Yup.string().trim().min(5, 'Enter a complete service address.').required('Service address is required.'),
   notes: Yup.string().max(500, 'Notes must be 500 characters or less.'),
 })
@@ -140,7 +144,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   }, [activeTab, loadServices])
 
   const bookingFormik = useFormik({
-    initialValues: { date: '', address: user?.address || '', notes: '' },
+    initialValues: { serviceItemId: '', date: '', address: user?.address || '', notes: '' },
     validationSchema: bookingSchema,
     onSubmit: async (values, { resetForm }) => {
       if (!bookingService) return
@@ -148,12 +152,13 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
       try {
         await createBooking({
           serviceId: bookingService._id,
+          serviceItemId: values.serviceItemId,
           date: values.date,
           address: values.address || user?.address || '',
           notes: values.notes,
         })
         setBookingService(null)
-        resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+        resetForm({ values: { serviceItemId: '', date: '', address: user?.address || '', notes: '' } })
         showToast('Booking request sent')
         await loadDashboard()
       } catch (err) {
@@ -313,7 +318,10 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 <tbody>
                   {bookings.slice(0, 5).map((booking) => (
                     <tr key={booking._id} className="border-b border-slate-100">
-                      <td className="py-3 pr-4 font-semibold text-slate-900">{booking.service?.title}</td>
+                      <td className="py-3 pr-4">
+                        <p className="font-semibold text-slate-900">{booking.service?.title}</p>
+                        {booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}
+                      </td>
                       <td className="py-3 pr-4 text-slate-600">
                         <div className="flex min-w-0 items-center gap-3">
                           <ProfileAvatar
@@ -403,7 +411,8 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 service={service}
                 phone={getProviderPhone(service)}
                 onBook={() => {
-                  bookingFormik.resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+                  const items = getServiceItems(service)
+                  bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: user?.address || '', notes: '' } })
                   setBookingService(service)
                 }}
                 onDetails={() => viewServiceDetails(service)}
@@ -470,7 +479,10 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
               <tbody>
                 {bookings.map((booking) => (
                   <tr key={booking._id} className="border-b border-slate-100">
-                    <td className="py-3 pr-4 font-semibold text-slate-900">{booking.service?.title}</td>
+                    <td className="py-3 pr-4">
+                      <p className="font-semibold text-slate-900">{booking.service?.title}</p>
+                      {booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}
+                    </td>
                     <td className="py-3 pr-4 text-slate-600">
                       <div className="flex min-w-0 items-center gap-3">
                         <ProfileAvatar
@@ -520,11 +532,58 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
 
       <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
         <form onSubmit={bookingFormik.handleSubmit}>
+          {bookingService && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-black text-slate-900">Choose service package</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Select one item. This exact service will be sent to the provider.</p>
+              <div className="mt-3 grid gap-2">
+                {getServiceItems(bookingService).map((item) => {
+                  const itemKey = item._id || item.name
+                  const active = bookingFormik.values.serviceItemId === itemKey
+                  return (
+                    <button
+                      key={itemKey}
+                      type="button"
+                      onClick={() => bookingFormik.setFieldValue('serviceItemId', itemKey)}
+                      className={`flex w-full items-start gap-3 rounded-xl border bg-white p-3 text-left transition ${active ? 'border-indigo-500 ring-4 ring-indigo-50' : 'border-slate-200 hover:border-indigo-200'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        readOnly
+                        tabIndex={-1}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-indigo-600"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-bold text-slate-900">{item.name}</p>
+                          <span className="shrink-0 font-black text-indigo-700">{formatCurrency(item.price)}</span>
+                        </div>
+                        {item.description && <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>}
+                        {item.duration && <p className="mt-1 text-xs font-semibold text-slate-500">{item.duration}</p>}
+                        {active && <p className="mt-2 text-xs font-black text-indigo-600">Selected for booking</p>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                <span className="font-bold text-slate-600">Final amount</span>
+                <span className="font-black text-slate-950">
+                  {formatCurrency(
+                    getServiceItems(bookingService).find((item) => (item._id || item.name) === bookingFormik.values.serviceItemId)?.price
+                      || getStartingPrice(bookingService),
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
           <label className="mt-5 block text-sm font-semibold text-slate-700">
             Preferred date and time <span className="text-rose-500">*</span>
             <input
               name="date"
               type="datetime-local"
+              min={getLocalDateTimeInputValue()}
               value={bookingFormik.values.date}
               onChange={bookingFormik.handleChange}
               onBlur={bookingFormik.handleBlur}
@@ -629,8 +688,8 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 <p className="mt-1 text-sm text-slate-600">{selectedService.category}</p>
               </div>
               <div>
-                <h3 className="font-bold text-slate-900">Price</h3>
-                <p className="mt-1 text-sm text-slate-600">{formatCurrency(selectedService.price)}</p>
+                <h3 className="font-bold text-slate-900">Starting Price</h3>
+                <p className="mt-1 text-sm text-slate-600">{formatCurrency(getStartingPrice(selectedService))}</p>
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 flex items-center gap-1">
@@ -649,17 +708,55 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 </p>
               </div>
             </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="font-bold text-slate-900">Included Services</h3>
+              <div className="mt-3 space-y-2">
+                {getServiceItems(selectedService).map((item) => (
+                  <button
+                    key={item._id || item.name}
+                    type="button"
+                    onClick={() => {
+                      bookingFormik.resetForm({
+                        values: {
+                          serviceItemId: item._id || item.name || '',
+                          date: '',
+                          address: user?.address || '',
+                          notes: '',
+                        },
+                      })
+                      setBookingService(selectedService)
+                      setSelectedService(null)
+                    }}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition hover:border-indigo-100 hover:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-50"
+                  >
+                    <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-slate-700">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <span className="shrink-0 font-black text-indigo-700">{formatCurrency(item.price)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-2">
               <h3 className="font-bold text-slate-900">Rating</h3>
               <div className="mt-1 flex items-center gap-2 text-sm text-slate-600">
-                <span className="text-amber-500">{'★'.repeat(Math.floor(selectedService.rating || 0))}{'☆'.repeat(5 - Math.floor(selectedService.rating || 0))}</span>
+                <span className="inline-flex text-amber-500">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <Star
+                      key={index}
+                      className={`h-4 w-4 ${index < Math.floor(selectedService.rating || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`}
+                    />
+                  ))}
+                </span>
                 <span>({selectedService.reviewsCount || 0} Reviews)</span>
               </div>
             </div>
             
             <div className="flex justify-end">
               <Button onClick={() => {
-                bookingFormik.resetForm({ values: { date: '', address: user?.address || '', notes: '' } })
+                const items = getServiceItems(selectedService)
+                bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: user?.address || '', notes: '' } })
                 setBookingService(selectedService)
                 setSelectedService(null)
               }}>

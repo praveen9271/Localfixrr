@@ -9,6 +9,7 @@ import PendingRegistration from '../models/PendingRegistration.js';
 import Report from '../models/Report.js';
 import AdminLog from '../models/AdminLog.js';
 import { buildPagination, getPagination } from '../utils/pagination.js';
+import { getStartingPrice, sanitizeServiceItems } from '../utils/serviceItems.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const BOOKING_STATUSES = ['pending', 'confirmed', 'accepted', 'in_progress', 'completed', 'cancelled', 'rejected'];
@@ -315,6 +316,27 @@ const deleteService = asyncHandler(async (req, res) => {
       services: 1,
     },
   });
+});
+
+const updateServiceItems = asyncHandler(async (req, res) => {
+  const service = await Service.findById(req.params.id);
+  if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+
+  const serviceItems = sanitizeServiceItems(req.body.serviceItems, {
+    category: service.category,
+    price: service.price,
+    title: service.title,
+  });
+  service.serviceItems = serviceItems;
+  service.price = getStartingPrice(serviceItems, service.price);
+  await service.save();
+
+  await logAdminAction(req, 'updated service items', 'services', service._id, {
+    title: service.title,
+    itemCount: serviceItems.length,
+  });
+
+  res.status(200).json({ success: true, message: 'Service items updated', service });
 });
 
 const getAllBookings = asyncHandler(async (req, res) => {
@@ -653,6 +675,7 @@ export {
   deleteProvider,
   getAllServices,
   deleteService,
+  updateServiceItems,
   getAllBookings,
   updateBookingStatus,
   getDashboardStats,

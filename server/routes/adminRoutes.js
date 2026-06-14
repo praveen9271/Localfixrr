@@ -9,6 +9,7 @@ import {
   deleteProvider,
   getAllServices,
   deleteService,
+  updateServiceItems,
   getAllBookings,
   updateBookingStatus,
   getDashboardStats,
@@ -47,6 +48,7 @@ router.delete('/providers/:id', deleteProvider);
 
 // Service management routes
 router.get('/services', getAllServices);
+router.put('/services/:id/items', updateServiceItems);
 router.delete('/services/:id', deleteService);
 
 // Booking management routes

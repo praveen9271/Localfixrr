@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getStartingPrice, sanitizeServiceItems } from '../utils/serviceItems.js';
 
 const normalizeServiceText = (value) =>
   String(value || '')
@@ -29,6 +30,30 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Please provide a price'],
     min: [0, 'Price cannot be negative']
   },
+  serviceItems: [
+    {
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      price: {
+        type: Number,
+        required: true,
+        min: [0, 'Price cannot be negative'],
+      },
+      description: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      duration: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+    },
+  ],
   provider: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Provider',
@@ -79,6 +104,12 @@ const serviceSchema = new mongoose.Schema({
 
 serviceSchema.pre('validate', function normalizeServiceIdentity() {
   this.normalizedTitle = normalizeServiceText(this.title);
+  this.serviceItems = sanitizeServiceItems(this.serviceItems, {
+    category: this.category,
+    price: this.price,
+    title: this.title,
+  });
+  this.price = getStartingPrice(this.serviceItems, this.price);
 });
 
 // Index for search

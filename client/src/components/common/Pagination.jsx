@@ -1,7 +1,5 @@
 import { memo } from 'react'
 
-const pageSizes = [5, 10, 20, 50]
-
 const getPageNumbers = (currentPage, totalPages) => {
   const pages = new Set([1, totalPages])
 
@@ -12,11 +10,10 @@ const getPageNumbers = (currentPage, totalPages) => {
   return Array.from(pages).sort((a, b) => a - b)
 }
 
-function Pagination({ pagination, onPageChange, onLimitChange, disabled = false }) {
+function Pagination({ pagination, onPageChange, disabled = false }) {
   const currentPage = pagination?.currentPage || pagination?.page || 1
   const totalPages = pagination?.totalPages || pagination?.pages || 1
   const totalItems = pagination?.totalItems || pagination?.total || 0
-  const limit = pagination?.limit || 5
   const pages = getPageNumbers(currentPage, totalPages)
 
   if (totalItems === 0) return null
@@ -28,18 +25,6 @@ function Pagination({ pagination, onPageChange, onLimitChange, disabled = false 
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={limit}
-          disabled={disabled}
-          onChange={(event) => onLimitChange(Number(event.target.value))}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm font-bold text-slate-600 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 disabled:opacity-60"
-          aria-label="Rows per page"
-        >
-          {pageSizes.map((size) => (
-            <option key={size} value={size}>{size} / page</option>
-          ))}
-        </select>
-
         <button
           type="button"
           disabled={disabled || currentPage <= 1}

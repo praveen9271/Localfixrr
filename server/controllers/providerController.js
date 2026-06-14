@@ -4,6 +4,7 @@ import Review from '../models/Review.js';
 import Provider from '../models/Provider.js';
 import { buildPagination, getPagination } from '../utils/pagination.js';
 import { normalizeServiceCategory } from '../config/serviceCategories.js';
+import { getStartingPrice, sanitizeServiceItems } from '../utils/serviceItems.js';
 
 const ensureProviderProfile = async (user) => {
   try {
@@ -25,7 +26,7 @@ const ensureProviderProfile = async (user) => {
 };
 
 const populateProviderBooking = [
-  { path: 'service', select: 'title category price location' },
+  { path: 'service', select: 'title category price serviceItems location' },
   { path: 'customer', select: 'name email phone address avatar' },
 ];
 
@@ -40,12 +41,20 @@ const getDuplicateServiceQuery = ({ providerId, title, category, excludeId = nul
   return query;
 };
 
+const getProviderAllowedCategories = (provider) =>
+  (provider?.skills || []).map(normalizeServiceCategory).filter(Boolean);
+
+const canUseServiceCategory = (provider, category) => {
+  const allowedCategories = getProviderAllowedCategories(provider);
+  return !allowedCategories.length || allowedCategories.includes(category);
+};
+
 // @desc    Create a new service
 // @route   POST /api/provider/services
 // @access  Service Provider
 const createService = async (req, res) => {
   try {
-    const { title, description, category, price, location, image } = req.body;
+    const { title, description, category, price, location, image, serviceItems } = req.body;
 
     // Enhanced validation
     if (!title || title.trim().length < 3) {
@@ -66,6 +75,13 @@ const createService = async (req, res) => {
     }
 
     const provider = req.provider || await ensureProviderProfile(req.user);
+    if (!canUseServiceCategory(provider, normalizedCategory)) {
+      return res.status(403).json({
+        success: false,
+        message: `You can only add services for ${getProviderAllowedCategories(provider).join(', ')}`,
+      });
+    }
+
     const duplicateService = await Service.exists(getDuplicateServiceQuery({
       providerId: provider._id,
       title,
@@ -79,11 +95,18 @@ const createService = async (req, res) => {
       });
     }
 
+    const nextServiceItems = sanitizeServiceItems(serviceItems, {
+      category: normalizedCategory,
+      price,
+      title,
+    });
+
     const service = await Service.create({
       title: title.trim(),
       description: description.trim(),
       category: normalizedCategory,
-      price: Number(price),
+      price: getStartingPrice(nextServiceItems, price),
+      serviceItems: nextServiceItems,
       provider: provider._id,
       location: location?.trim() || req.user.address?.trim() || '',
       image: image?.trim() || ''
@@ -154,7 +177,7 @@ const updateService = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to update this service' });
     }
 
-    const { title, description, category, price, location, image, status } = req.body;
+    const { title, description, category, price, location, image, status, serviceItems } = req.body;
     const nextTitle = title !== undefined ? title : service.title;
     let nextCategory = service.category;
 
@@ -166,6 +189,12 @@ const updateService = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please select a valid LocalFixr service category' });
       }
       nextCategory = normalizedCategory;
+      if (!canUseServiceCategory(provider, normalizedCategory)) {
+        return res.status(403).json({
+          success: false,
+          message: `You can only add services for ${getProviderAllowedCategories(provider).join(', ')}`,
+        });
+      }
       service.category = normalizedCategory;
     }
 
@@ -183,7 +212,16 @@ const updateService = async (req, res) => {
       });
     }
 
-    if (price !== undefined) service.price = price;
+    if (serviceItems !== undefined) {
+      service.serviceItems = sanitizeServiceItems(serviceItems, {
+        category: service.category,
+        price: price !== undefined ? price : service.price,
+        title: service.title,
+      });
+      service.price = getStartingPrice(service.serviceItems, price !== undefined ? price : service.price);
+    } else if (price !== undefined) {
+      service.price = price;
+    }
     if (location !== undefined) service.location = location;
     if (image !== undefined) service.image = image;
     if (status) service.status = status;
@@ -375,7 +413,13 @@ const updateProviderProfile = async (req, res) => {
     if (businessName !== undefined) provider.businessName = businessName;
     if (bio !== undefined) provider.bio = bio;
     if (Array.isArray(skills)) {
-      provider.skills = skills.map(normalizeServiceCategory).filter(Boolean);
+      const nextSkills = skills.map(normalizeServiceCategory).filter(Boolean);
+      const currentSkills = getProviderAllowedCategories(provider);
+      const skillsChanged = nextSkills.join('|') !== currentSkills.join('|');
+      if (currentSkills.length && skillsChanged) {
+        return res.status(400).json({ success: false, message: 'Service work cannot be changed after registration.' });
+      }
+      provider.skills = nextSkills;
     }
     if (Array.isArray(serviceAreas)) provider.serviceAreas = serviceAreas;
     if (experienceYears !== undefined) provider.experienceYears = Number(experienceYears) || 0;

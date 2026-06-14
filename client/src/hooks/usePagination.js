@@ -4,12 +4,12 @@ const defaultPagination = {
   currentPage: 1,
   totalPages: 1,
   totalItems: 0,
-  limit: 5,
+  limit: 10,
   hasNextPage: false,
   hasPrevPage: false,
 }
 
-const normalizePagination = (pagination, fallbackLimit = 5) => ({
+const normalizePagination = (pagination, fallbackLimit = 10) => ({
   currentPage: pagination?.currentPage || pagination?.page || 1,
   totalPages: pagination?.totalPages || pagination?.pages || 1,
   totalItems: pagination?.totalItems || pagination?.total || 0,
@@ -18,7 +18,7 @@ const normalizePagination = (pagination, fallbackLimit = 5) => ({
   hasPrevPage: Boolean(pagination?.hasPrevPage),
 })
 
-function usePagination(initialLimit = 5) {
+function usePagination(initialLimit = 10) {
   const [pagination, setPaginationState] = useState({
     ...defaultPagination,
     limit: initialLimit,

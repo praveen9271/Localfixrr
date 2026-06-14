@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormik } from 'formik'
+import { BriefcaseBusiness, Clock, PackageCheck, Plus, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
 import { syncCurrentUser } from '../services/authService'
@@ -13,7 +14,6 @@ import {
   updateBookingStatus,
   updateProviderProfile,
   updateService,
-  uploadImage,
   getProviderReviews,
 } from '../services/dashboardService'
 import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
@@ -32,6 +32,7 @@ import ProfileAvatar from '../components/profile/ProfileAvatar'
 import ProfilePhotoPanel from '../components/profile/ProfilePhotoPanel'
 import { formatCurrency, formatDateTime, formatStatus } from '../utils/formatters'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
+import { SERVICE_ITEM_TEMPLATES, getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
 
 const blankService = {
   title: '',
@@ -41,16 +42,25 @@ const blankService = {
   description: '',
   image: '',
   status: 'active',
+  serviceItems: [
+    { name: '', price: '', description: '', duration: '' },
+  ],
 }
 
 const serviceSchema = Yup.object({
-  title: Yup.string().trim().min(3, 'Title must be at least 3 characters.').required('Title is required.'),
+  title: Yup.string().trim().min(3, 'Provider name must be at least 3 characters.').required('Provider name is required.'),
   category: Yup.string().required('Category is required.'),
   price: Yup.number().typeError('Enter a valid price.').min(0, 'Price cannot be negative.').required('Price is required.'),
   location: Yup.string().trim().max(120, 'Location is too long.'),
   description: Yup.string().trim().min(10, 'Description must be at least 10 characters.').required('Description is required.'),
   image: Yup.string().url('Image must be a valid URL.'),
   status: Yup.string().oneOf(['active', 'inactive']).required('Status is required.'),
+  serviceItems: Yup.array().of(Yup.object({
+    name: Yup.string().trim().required('Item name is required.'),
+    price: Yup.number().typeError('Enter price.').min(0, 'Price cannot be negative.').required('Price is required.'),
+    description: Yup.string().trim().max(180, 'Description is too long.'),
+    duration: Yup.string().trim().max(40, 'Duration is too long.'),
+  })).min(1, 'Add at least one service item.'),
 })
 
 const providerProfileSchema = Yup.object({
@@ -69,6 +79,29 @@ const normalizeServiceIdentity = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const normalizeServiceItems = (items) => {
+  const seen = new Set()
+  return items.filter((item) => {
+    const key = String(item.name || '').trim().toLowerCase()
+    if (!key) return true
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const toDisplayText = (value, fallback = '') => {
+  if (value === null || value === undefined) return fallback
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return fallback
+}
+
+const cloneServiceItems = (items) => items.map((item) => ({ ...item }))
+
+const getProviderListingTitle = (sourceProfile) =>
+  toDisplayText(sourceProfile?.businessName || sourceProfile?.user?.name, '').trim()
+
 function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   const navigate = useNavigate()
   const activeTab = defaultTab
@@ -83,11 +116,12 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null })
+  const serviceFormRef = useRef(null)
 
-  const showToast = (message) => {
+  const showToast = useCallback((message) => {
     setToast(message)
     setTimeout(() => setToast(''), 3000)
-  }
+  }, [])
 
   const {
     currentUser: user,
@@ -104,10 +138,33 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     onError: setError,
   })
 
+  const providerServiceCategories = (profile?.skills || []).filter((category) => SERVICE_CATEGORIES.includes(category))
+  const lockedServiceCategory = providerServiceCategories[0] || ''
+  const serviceCategoryOptions = providerServiceCategories.length ? providerServiceCategories : SERVICE_CATEGORIES
+  const getServiceFormDefaults = (category = lockedServiceCategory) => {
+    const defaultCategory = category || ''
+    const template = SERVICE_ITEM_TEMPLATES[defaultCategory]
+    const serviceItems = template?.length ? cloneServiceItems(template) : [makeBlankServiceItem()]
+    const prices = serviceItems.map((item) => Number(item.price)).filter((price) => Number.isFinite(price))
+
+    return {
+      ...blankService,
+      title: getProviderListingTitle(profile),
+      category: defaultCategory,
+      price: prices.length ? Math.min(...prices) : '',
+      serviceItems,
+    }
+  }
+
   const serviceFormik = useFormik({
     initialValues: blankService,
     validationSchema: serviceSchema,
     onSubmit: async (values, { resetForm }) => {
+      if (lockedServiceCategory && values.category !== lockedServiceCategory) {
+        showToast(`You can only add ${lockedServiceCategory} services`)
+        return
+      }
+
       const duplicateService = services.find((service) =>
         service._id !== editingId &&
         normalizeServiceIdentity(service.title) === normalizeServiceIdentity(values.title) &&
@@ -121,7 +178,15 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
 
       setSaving(true)
       try {
-        const payload = { ...values, price: Number(values.price) }
+        const serviceItems = normalizeServiceItems(values.serviceItems).map((item) => ({
+          ...item,
+          price: Number(item.price),
+        }))
+        const payload = {
+          ...values,
+          price: Number(values.price),
+          serviceItems,
+        }
         if (editingId) {
           await updateService(editingId, payload)
           showToast('Service updated')
@@ -129,7 +194,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
           await createService(payload)
           showToast('Service created')
         }
-        resetForm({ values: blankService })
+        resetForm({ values: getServiceFormDefaults(lockedServiceCategory || values.category) })
         setEditingId(null)
         await loadDashboard()
       } catch (err) {
@@ -139,6 +204,16 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       }
     },
   })
+
+  const currentTemplateItems = SERVICE_ITEM_TEMPLATES[serviceFormik.values.category] || []
+  const currentServiceItems = serviceFormik.values.serviceItems || []
+  const defaultItemNames = new Set(currentTemplateItems.map((item) => item.name.trim().toLowerCase()))
+  const defaultPackageCount = currentServiceItems.filter((item) => defaultItemNames.has(String(item.name || '').trim().toLowerCase())).length
+  const serviceItemPrices = currentServiceItems
+    .map((item) => Number(item.price))
+    .filter((price) => Number.isFinite(price) && price >= 0)
+  const startingPrice = serviceItemPrices.length ? Math.min(...serviceItemPrices) : 0
+  const selectedServiceCategory = serviceFormik.values.category || lockedServiceCategory || 'Not selected'
 
   const profileFormik = useFormik({
     initialValues: { businessName: '', bio: '', serviceAreas: '', skills: '', available: true },
@@ -186,10 +261,15 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     },
   })
   const providerProfileSetValuesRef = useRef(profileFormik.setValues)
+  const serviceFormikRef = useRef(serviceFormik)
 
   useEffect(() => {
     providerProfileSetValuesRef.current = profileFormik.setValues
   }, [profileFormik.setValues])
+
+  useEffect(() => {
+    serviceFormikRef.current = serviceFormik
+  }, [serviceFormik])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -213,6 +293,19 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
         skills: (nextProfile?.skills || []).join(', '),
         available: Boolean(nextProfile?.available),
       })
+      const registeredCategory = (nextProfile?.skills || []).find((category) => SERVICE_CATEGORIES.includes(category))
+      const providerTitle = getProviderListingTitle(nextProfile)
+      if (providerTitle && !serviceFormikRef.current.values.title.trim()) {
+        serviceFormikRef.current.setFieldValue('title', providerTitle)
+      }
+      if (registeredCategory && !serviceFormikRef.current.values.category) {
+        const template = SERVICE_ITEM_TEMPLATES[registeredCategory]
+        const nextItems = template?.length ? cloneServiceItems(template) : [makeBlankServiceItem()]
+        const prices = nextItems.map((item) => Number(item.price)).filter((price) => Number.isFinite(price))
+        serviceFormikRef.current.setFieldValue('category', registeredCategory)
+        serviceFormikRef.current.setFieldValue('serviceItems', nextItems)
+        serviceFormikRef.current.setFieldValue('price', prices.length ? Math.min(...prices) : '')
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load provider dashboard')
     } finally {
@@ -227,7 +320,7 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to load reviews')
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -240,31 +333,63 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   }, [activeTab, loadDashboard, loadReviews])
 
   const resetServiceForm = () => {
-    serviceFormik.resetForm({ values: blankService })
+    serviceFormik.resetForm({ values: getServiceFormDefaults() })
     setEditingId(null)
   }
 
-  const handleServiceImageUpload = async (event) => {
-    const input = event.currentTarget
-    const file = input?.files?.[0]
-    if (!file) return
+  const setServiceItemsAndPrice = (items) => {
+    const nextItems = normalizeServiceItems(items)
+    serviceFormik.setFieldValue('serviceItems', nextItems.length ? nextItems : [makeBlankServiceItem()])
+    const prices = nextItems.map((item) => Number(item.price)).filter((price) => Number.isFinite(price))
+    serviceFormik.setFieldValue('price', prices.length ? Math.min(...prices) : '')
+  }
+
+  const setServiceItemField = (index, field, value) => {
+    const nextItems = [...serviceFormik.values.serviceItems]
+    nextItems[index] = { ...nextItems[index], [field]: value }
+    if (field === 'name') {
+      const duplicate = nextItems.some((item, itemIndex) =>
+        itemIndex !== index &&
+        item.name?.trim().toLowerCase() &&
+        item.name.trim().toLowerCase() === value.trim().toLowerCase(),
+      )
+      if (duplicate) showToast('This item is already added')
+    }
+    serviceFormik.setFieldValue('serviceItems', nextItems)
+    if (field === 'price') {
+      const prices = nextItems.map((item) => Number(item.price)).filter((price) => Number.isFinite(price))
+      if (prices.length) serviceFormik.setFieldValue('price', Math.min(...prices))
+    }
+  }
+
+  const addServiceItem = () => {
+    setServiceItemsAndPrice([...serviceFormik.values.serviceItems, makeBlankServiceItem()])
+  }
+
+  const removeServiceItem = (index) => {
+    const nextItems = serviceFormik.values.serviceItems.filter((_, itemIndex) => itemIndex !== index)
+    setServiceItemsAndPrice(nextItems)
+  }
+
+  const removeServiceImage = async (serviceId = editingId) => {
+    serviceFormik.setFieldValue('image', '')
+    if (!serviceId) return
 
     setSaving(true)
     try {
-      const data = await uploadImage(file, 'services')
-      serviceFormik.setFieldValue('image', data.image?.optimizedUrl || data.image?.url || data.url || '')
-      showToast('Image uploaded')
+      await updateService(serviceId, { image: '' })
+      showToast('Service image removed')
+      await loadDashboard()
     } catch (err) {
-      showToast(err.response?.data?.message || 'Unable to upload image')
+      showToast(err.response?.data?.message || 'Unable to remove image')
     } finally {
-      if (input) input.value = ''
       setSaving(false)
     }
   }
 
   const startEdit = (service) => {
     setEditingId(service._id)
-    serviceFormik.setValues({
+    serviceFormik.resetForm({ values: {
       title: service.title || '',
       category: service.category || '',
       price: service.price || '',
@@ -272,8 +397,17 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       description: service.description || '',
       image: service.image || '',
       status: service.status || 'active',
-    })
+      serviceItems: getServiceItems(service).map((item) => ({
+        name: item.name || '',
+        price: item.price || '',
+        description: item.description || '',
+        duration: item.duration || '',
+      })),
+    } })
     navigate('/dashboard/provider/services')
+    requestAnimationFrame(() => {
+      serviceFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   const confirmDeleteService = (service) => {
@@ -330,41 +464,30 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider Panel</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-900">Service Provider Dashboard</h1>
-        <p className="mt-1 text-slate-500">Manage services, booking requests, earnings, and reviews.</p>
+        {activeTab === 'services' ? (
+          <>
+            <h1 className="text-3xl font-black text-slate-900">{editingId ? 'Edit Service' : 'Add Service'}</h1>
+            <p className="mt-1 text-slate-500">Add service details and manage packages.</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">LocalFixr Provider Panel</p>
+            <h1 className="mt-2 text-3xl font-black text-slate-900">Service Provider Dashboard</h1>
+            <p className="mt-1 text-slate-500">Manage services, booking requests, earnings, and reviews.</p>
+          </>
+        )}
       </div>
 
       <Alert>{error}</Alert>
 
-      <DraggableGrid
-        items={statCards}
-        storageKey="localfixr-provider-dashboard-card-order"
-        className="grid gap-4 md:grid-cols-5"
-        renderItem={(card) => <StatCard label={card.label} value={card.value} />}
-      />
-
-      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-        {[
-          { key: 'bookings', label: 'Bookings', path: '/dashboard/provider/bookings' },
-          { key: 'services', label: 'Services', path: '/dashboard/provider/services' },
-          { key: 'reviews', label: 'Reviews', path: '/dashboard/provider/reviews' },
-          { key: 'profile', label: 'Profile', path: '/dashboard/provider/profile' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => {
-              navigate(tab.path)
-            }}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
-              activeTab === tab.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {activeTab !== 'services' && (
+        <DraggableGrid
+          items={statCards}
+          storageKey="localfixr-provider-dashboard-card-order"
+          className="grid gap-4 md:grid-cols-5"
+          renderItem={(card) => <StatCard label={card.label} value={card.value} />}
+        />
+      )}
 
       {activeTab === 'bookings' && (
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -403,7 +526,20 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">{booking.service?.title}</td>
+                    <td className="py-3 pr-4 text-slate-600">
+                      <p className="font-semibold text-slate-900">{booking.service?.title}</p>
+                      {booking.serviceItem?.name && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                          <span className="text-indigo-600">Booked: {booking.serviceItem.name}</span>
+                          {booking.serviceItem.price !== undefined && (
+                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                              {formatCurrency(booking.serviceItem.price)}
+                            </span>
+                          )}
+                          {booking.serviceItem.duration && <span className="text-slate-500">{booking.serviceItem.duration}</span>}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 pr-4 text-slate-600">{formatDateTime(booking.date)}</td>
                     <td className="py-3 pr-4 text-slate-600">{formatCurrency(booking.totalAmount)}</td>
                     <td className="py-3 pr-4"><StatusBadge status={booking.status} /></td>
@@ -433,110 +569,186 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
       )}
 
       {activeTab === 'services' && (
-        <section className="grid gap-6 lg:grid-cols-[400px_1fr]">
-          <form onSubmit={serviceFormik.handleSubmit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-black text-slate-900">{editingId ? 'Edit Service' : 'Add Service'}</h2>
-            {[
-              ['title', 'Title'],
-              ['price', 'Price'],
-              ['location', 'Location'],
-            ].map(([name, label]) => (
-              <div key={name}>
-                <FormField
-                  name={name}
-                  label={<>{label}{name !== 'location' && <span className="text-rose-500"> *</span>}</>}
-                  className="mt-4"
-                  type={name === 'price' ? 'number' : 'text'}
-                  value={serviceFormik.values[name]}
-                  onChange={serviceFormik.handleChange}
-                  onBlur={serviceFormik.handleBlur}
-                />
-                {serviceFormik.touched[name] && serviceFormik.errors[name] && (
-                  <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors[name]}</span>
+        <section className="space-y-6">
+          <form ref={serviceFormRef} onSubmit={serviceFormik.handleSubmit} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="space-y-6 p-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid gap-4 lg:grid-cols-[1fr_12rem_2fr]">
+                  <div>
+                    <FormField
+                      name="title"
+                      label={<>Provider Name<span className="text-rose-500"> *</span></>}
+                      type="text"
+                      placeholder="Enter provider name"
+                      value={serviceFormik.values.title}
+                      onChange={serviceFormik.handleChange}
+                      onBlur={serviceFormik.handleBlur}
+                    />
+                    {serviceFormik.touched.title && serviceFormik.errors.title && (
+                      <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.title}</span>
+                    )}
+                  </div>
+
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Status
+                    <select
+                      name="status"
+                      value={serviceFormik.values.status}
+                      onChange={serviceFormik.handleChange}
+                      onBlur={serviceFormik.handleBlur}
+                      className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Description <span className="text-rose-500">*</span>
+                    <textarea
+                      name="description"
+                      rows="1"
+                      value={serviceFormik.values.description}
+                      onChange={serviceFormik.handleChange}
+                      onBlur={serviceFormik.handleBlur}
+                      className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
+                        serviceFormik.touched.description && serviceFormik.errors.description ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
+                      }`}
+                    />
+                    {serviceFormik.touched.description && serviceFormik.errors.description && (
+                      <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.description}</span>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700">
+                      <BriefcaseBusiness className="h-6 w-6" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-slate-500">Total Packages</p>
+                      <p className="mt-1 text-2xl font-black text-slate-950">{currentServiceItems.length}</p>
+                      <p className="mt-1 text-xs font-bold text-indigo-600">{defaultPackageCount} default packages</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-700">
+                      <Sparkles className="h-6 w-6" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-slate-500">Starting From</p>
+                      <p className="mt-1 text-2xl font-black text-slate-950">{formatCurrency(startingPrice)}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Minimum package price</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-sky-50 text-sky-700">
+                      <Wrench className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-500">Work Type</p>
+                      <p className="mt-1 truncate text-2xl font-black text-indigo-700">{selectedServiceCategory}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Current category</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="space-y-3 p-5">
+                  {currentServiceItems.map((item, index) => {
+                    const isDefaultPackage = defaultItemNames.has(String(item.name || '').trim().toLowerCase())
+                    return (
+                      <div key={`service-package-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="grid gap-4 lg:grid-cols-[auto_1.1fr_0.45fr_0.55fr_auto] lg:items-center">
+                          <div className="flex items-center">
+                            <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700">
+                              {isDefaultPackage ? <PackageCheck className="h-6 w-6" /> : <BriefcaseBusiness className="h-6 w-6" />}
+                            </span>
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                value={item.name}
+                                onChange={(event) => setServiceItemField(index, 'name', event.target.value)}
+                                placeholder="Package name"
+                                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-0 py-1 text-base font-black text-slate-950 outline-none transition focus:border-indigo-200 focus:bg-white focus:px-3"
+                              />
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-black ${isDefaultPackage ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                {isDefaultPackage ? 'Default' : 'Custom'}
+                              </span>
+                            </div>
+                            <input
+                              value={item.description}
+                              onChange={(event) => setServiceItemField(index, 'description', event.target.value)}
+                              placeholder="Package description"
+                              className="mt-1 w-full rounded-lg border border-transparent bg-transparent px-0 py-1 text-sm font-medium text-slate-500 outline-none transition focus:border-indigo-200 focus:bg-white focus:px-3"
+                            />
+                          </div>
+
+                          <label className="block">
+                            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Price</span>
+                            <input
+                              value={item.price}
+                              onChange={(event) => setServiceItemField(index, 'price', event.target.value)}
+                              placeholder="499"
+                              type="number"
+                              min="0"
+                              className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-950 outline-none focus:border-indigo-400 focus:bg-white"
+                            />
+                          </label>
+
+                          <label className="block">
+                            <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                              <Clock className="h-3.5 w-3.5" />
+                              Duration
+                            </span>
+                            <input
+                              value={item.duration}
+                              onChange={(event) => setServiceItemField(index, 'duration', event.target.value)}
+                              placeholder="60 min"
+                              className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-950 outline-none focus:border-indigo-400 focus:bg-white"
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => removeServiceItem(index)}
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 text-xs font-black text-rose-600 transition hover:bg-rose-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {serviceFormik.touched.serviceItems && typeof serviceFormik.errors.serviceItems === 'string' && (
+                  <span className="block px-5 pb-5 text-xs font-semibold text-rose-600">{serviceFormik.errors.serviceItems}</span>
                 )}
               </div>
-            ))}
-            <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Category <span className="text-rose-500">*</span>
-              <select
-                name="category"
-                value={serviceFormik.values.category}
-                onChange={serviceFormik.handleChange}
-                onBlur={serviceFormik.handleBlur}
-                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
-                  serviceFormik.touched.category && serviceFormik.errors.category ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
-                }`}
-              >
-                <option value="">Select a category</option>
-                {SERVICE_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              {serviceFormik.touched.category && serviceFormik.errors.category && (
-                <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.category}</span>
-              )}
-            </label>
-            
-            <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Status
-              <select
-                name="status"
-                value={serviceFormik.values.status}
-                onChange={serviceFormik.handleChange}
-                onBlur={serviceFormik.handleBlur}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-indigo-400"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </label>
-            <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Service Image
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleServiceImageUpload}
-                disabled={saving}
-                className="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
-              />
-            </label>
-            {serviceFormik.values.image && (
-              <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-                <img
-                  src={serviceFormik.values.image}
-                  alt="Service preview"
-                  className="h-36 w-full object-cover"
-                />
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
+                {editingId && <Button variant="secondary" onClick={resetServiceForm}>Cancel</Button>}
                 <button
                   type="button"
-                  onClick={() => serviceFormik.setFieldValue('image', '')}
-                  className="w-full bg-slate-50 px-3 py-2 text-left text-xs font-bold text-rose-600 transition hover:bg-rose-50"
+                  onClick={addServiceItem}
+                  className="inline-flex h-11 min-w-36 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
                 >
-                  Remove image
+                  <Plus className="h-4 w-4" />
+                  Add Package
                 </button>
+                <Button type="submit" disabled={saving} className="h-11 min-w-36 rounded-xl px-5 text-sm font-semibold">
+                  {editingId ? 'Update' : 'Create'}
+                </Button>
               </div>
-            )}
-            <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Description <span className="text-rose-500">*</span>
-              <textarea
-                name="description"
-                rows="4"
-                value={serviceFormik.values.description}
-                onChange={serviceFormik.handleChange}
-                onBlur={serviceFormik.handleBlur}
-                className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none focus:border-indigo-400 ${
-                  serviceFormik.touched.description && serviceFormik.errors.description ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
-                }`}
-              />
-              {serviceFormik.touched.description && serviceFormik.errors.description && (
-                <span className="mt-2 block text-xs font-semibold text-rose-600">{serviceFormik.errors.description}</span>
-              )}
-            </label>
-            <div className="mt-5 flex gap-3">
-              <Button type="submit" disabled={saving}>
-                {editingId ? 'Update' : 'Create'}
-              </Button>
-              {editingId && <Button variant="secondary" onClick={resetServiceForm}>Cancel</Button>}
             </div>
           </form>
 
@@ -547,26 +759,49 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
             </div>
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
               {services.map((service) => (
-                <article key={service._id} className="rounded-lg border border-slate-200 p-4 hover:shadow-md transition">
+                <article key={service._id} className="rounded-lg border border-slate-200 p-4 transition hover:shadow-md">
                   {service.image && (
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      className="mb-4 h-32 w-full rounded-lg object-cover"
-                      loading="lazy"
-                    />
+                    <div className="mb-4 overflow-hidden rounded-lg border border-slate-200">
+                      <img
+                        src={service.image}
+                        alt={service.title}
+                        className="h-32 w-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => removeServiceImage(service._id)}
+                        className="w-full bg-slate-50 px-3 py-2 text-left text-xs font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                      >
+                        Remove image
+                      </button>
+                    </div>
                   )}
                   <div className="flex justify-between gap-4">
                     <div>
-                      <h3 className="font-bold text-slate-900">{service.title}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{service.category}</p>
+                      <h3 className="font-bold text-slate-900">{toDisplayText(service.title, 'Untitled service')}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{toDisplayText(service.category, 'General')}</p>
                     </div>
                     <StatusBadge status={service.status} />
                   </div>
-                  <p className="mt-3 text-sm text-slate-600 line-clamp-2">{service.description}</p>
+                  <p className="mt-3 line-clamp-2 text-sm text-slate-600">
+                    {toDisplayText(service.description, 'No description available.')}
+                  </p>
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="font-black text-indigo-700">{formatCurrency(service.price)}</span>
-                    {service.location && <span className="text-xs text-slate-500">{service.location}</span>}
+                    <span className="font-black text-indigo-700">From {formatCurrency(service.price)}</span>
+                    {toDisplayText(service.location) && <span className="text-xs text-slate-500">{toDisplayText(service.location)}</span>}
+                  </div>
+                  <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Packages</p>
+                    <div className="mt-2 space-y-1.5">
+                      {getServiceItems(service).slice(0, 3).map((item, index) => (
+                        <div key={`${service._id}-${item.name || index}`} className="flex items-center justify-between gap-3 text-xs">
+                          <span className="truncate font-semibold text-slate-700">{item.name}</span>
+                          <span className="shrink-0 font-black text-slate-900">{formatCurrency(item.price)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Button variant="secondary" onClick={() => startEdit(service)} size="sm">Edit</Button>
@@ -674,15 +909,21 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                 value={profileFormik.values.skills}
                 onChange={profileFormik.handleChange}
                 onBlur={profileFormik.handleBlur}
+                disabled={Boolean(lockedServiceCategory)}
                 className={`mt-2 w-full rounded-lg border px-4 py-3 outline-none transition focus:border-indigo-400 ${
                   profileFormik.touched.skills && profileFormik.errors.skills ? 'border-rose-300 bg-rose-50' : 'border-slate-200'
                 }`}
               >
-                <option value="">Select your work type</option>
-                {SERVICE_CATEGORIES.map((category) => (
+                {!lockedServiceCategory && <option value="">Select your work type</option>}
+                {serviceCategoryOptions.map((category) => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
+              {lockedServiceCategory && (
+                <span className="mt-2 block text-xs font-semibold text-slate-500">
+                  Service work cannot be changed after registration.
+                </span>
+              )}
               {profileFormik.touched.skills && profileFormik.errors.skills && (
                 <span className="mt-2 block text-xs font-semibold text-rose-600">{profileFormik.errors.skills}</span>
               )}
