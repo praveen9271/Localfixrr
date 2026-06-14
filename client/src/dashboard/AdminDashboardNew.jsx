@@ -73,6 +73,7 @@ import ConfirmModal from '../components/ui/ConfirmModal'
 import DraggableGrid from '../components/ui/DraggableGrid'
 import EmptyState from '../components/ui/EmptyState'
 import LoadingGrid from '../components/ui/LoadingGrid'
+import StarRating from '../components/ui/StarRating'
 import Toast from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../utils/formatters'
 import useDebounce from '../hooks/useDebounce'
@@ -911,7 +912,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                 { key: 'service', label: 'Service', render: (review) => review.service?.title || '-' },
                 { key: 'user', label: 'User', render: (review) => review.user?.name || '-' },
                 { key: 'provider', label: 'Provider', render: (review) => review.provider?.businessName || '-' },
-                { key: 'rating', label: 'Rating', render: (review) => `${review.rating}/5` },
+                { key: 'rating', label: 'Rating', render: (review) => <StarRating value={review.rating} /> },
                 { key: 'comment', label: 'Comment' },
                 { key: 'actions', label: 'Actions', render: (review) => <IconButton title="Delete review" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={() => confirmAction('Delete review', 'Remove this review?', () => deleteReview(review._id), 'Review deleted')}><Trash2 className="h-4 w-4" /></IconButton> },
               ]}

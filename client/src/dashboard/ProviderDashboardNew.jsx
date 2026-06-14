@@ -27,6 +27,7 @@ import FormField from '../components/ui/FormField'
 import LoadingGrid from '../components/ui/LoadingGrid'
 import StatCard from '../components/ui/StatCard'
 import StatusBadge from '../components/ui/StatusBadge'
+import StarRating from '../components/ui/StarRating'
 import Toast from '../components/ui/Toast'
 import ProfileAvatar from '../components/profile/ProfileAvatar'
 import ProfilePhotoPanel from '../components/profile/ProfilePhotoPanel'
@@ -821,9 +822,14 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-black text-slate-900">Customer Reviews</h2>
             <div className="flex items-center gap-4">
-              <span className="text-sm font-semibold text-slate-500">
-                Average: {profile?.rating ? `${profile.rating.toFixed(1)} / 5` : 'No ratings yet'}
-              </span>
+              {profile?.rating ? (
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
+                  Average:
+                  <StarRating value={profile.rating} />
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-slate-500">No ratings yet</span>
+              )}
               <span className="text-sm font-semibold text-slate-500">
                 {reviews.length} Total
               </span>
@@ -840,7 +846,9 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                       <span>By {review.user?.name}</span>
                     </div>
                   </div>
-                  <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">{review.rating}/5</span>
+                  <span className="rounded-full bg-amber-50 px-3 py-1.5">
+                    <StarRating value={review.rating} />
+                  </span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">{review.comment}</p>
                 <p className="mt-3 text-xs text-slate-500">{formatDateTime(review.createdAt)}</p>

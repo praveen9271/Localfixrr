@@ -8,6 +8,7 @@ import { createBooking, getPublicServiceDetails, getServiceReviews } from '../se
 import { getCurrentUser, isAuthenticated, isUser } from '../services/authService'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
+import StarRating from '../components/ui/StarRating'
 import ProfileAvatar from '../components/profile/ProfileAvatar'
 import useProtectedBooking from '../hooks/useProtectedBooking'
 import {
@@ -258,13 +259,13 @@ function ProviderDetails() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               ['Starting Price', formatCurrency(startingPrice)],
-              ['Rating', `${service.rating || 0}/5`],
+              ['Rating', <StarRating key="service-rating" value={service.rating} size="md" />],
               ['Reviews', service.reviewsCount || 0],
               ['Location', serviceLocation],
             ].map(([label, value]) => (
               <div key={label} className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-sm text-slate-500">{label}</p>
-                <p className="mt-2 truncate text-lg font-black text-slate-900" title={String(value)}>{value}</p>
+                <div className="mt-2 min-h-7 text-lg font-black text-slate-900">{value}</div>
               </div>
             ))}
           </div>
@@ -354,7 +355,9 @@ function ProviderDetails() {
                   <ProfileAvatar src={review.user?.avatar} name={review.user?.name} size="sm" />
                   <p className="truncate font-bold text-slate-900">{review.user?.name || 'Customer'}</p>
                 </div>
-                <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">{review.rating}/5</span>
+                <span className="rounded-full bg-amber-50 px-3 py-1.5">
+                  <StarRating value={review.rating} />
+                </span>
               </div>
               <p className="mt-3 text-sm leading-7 text-slate-600">{review.comment}</p>
             </article>

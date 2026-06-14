@@ -3,6 +3,7 @@ import { getPublicServices, getServiceReviews } from '../services/dashboardServi
 import LoadingGrid from '../components/ui/LoadingGrid'
 import EmptyState from '../components/ui/EmptyState'
 import ProfileAvatar from '../components/profile/ProfileAvatar'
+import StarRating from '../components/ui/StarRating'
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -98,8 +99,8 @@ function Reviews() {
                   <p className="text-xs text-slate-500">{formatDate(review.createdAt)}</p>
                 </div>
               </div>
-              <div className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
-                Rating {Number(review.rating || 0)}/5
+              <div className="rounded-full bg-amber-50 px-3 py-1.5">
+                <StarRating value={review.rating} />
               </div>
             </div>
 
