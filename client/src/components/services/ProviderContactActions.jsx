@@ -2,10 +2,10 @@ import { MessageCircle, Phone } from 'lucide-react'
 
 const normalizeIndianPhone = (value) => String(value || '').replace(/\D/g, '').slice(-10)
 
-function WhatsAppIcon({ className = 'h-4 w-4' }) {
+function WhatsAppIcon({ className = 'h-5 w-5' }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M12.04 3.5a8.45 8.45 0 0 0-7.23 12.82L3.5 20.5l4.29-1.26a8.47 8.47 0 1 0 4.25-15.74Zm0 1.7a6.77 6.77 0 1 1 0 13.54 6.67 6.67 0 0 1-3.49-.98l-.33-.2-2.19.64.66-2.1-.22-.35A6.75 6.75 0 0 1 12.04 5.2Zm-2.3 3.33c-.16 0-.42.06-.65.32-.22.25-.86.84-.86 2.04 0 1.21.88 2.37 1 2.54.13.17 1.73 2.65 4.2 3.71 2.08.9 2.5.72 2.95.68.45-.04 1.46-.6 1.66-1.17.21-.58.21-1.08.15-1.18-.06-.1-.23-.16-.48-.29-.25-.12-1.46-.72-1.69-.8-.23-.09-.39-.13-.56.12-.16.25-.64.8-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.48-1.38-1.73-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.43-.06-.13-.56-1.36-.77-1.86-.2-.49-.4-.42-.56-.43h-.46Z" />
+      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.76-1.66-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.05 1.02-1.05 2.5s1.07 2.9 1.22 3.1c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.19 1.87.12.57-.08 1.76-.72 2-1.41.25-.69.25-1.28.18-1.41-.08-.13-.28-.2-.58-.35M12.04 2a10 10 0 0 0-8.58 15.15L2 22l4.98-1.31A10 10 0 1 0 12.04 2m0 1.69a8.31 8.31 0 1 1-.01 16.62 8.3 8.3 0 0 1-4.23-1.16l-.3-.18-2.95.77.79-2.87-.2-.31a8.31 8.31 0 0 1 6.9-12.87" />
     </svg>
   )
 }
@@ -22,25 +22,28 @@ function DisabledContactButton({ children }) {
   )
 }
 
-function ProviderContactActions({ phone, className = '', buttonClassName = '', compact = false }) {
+function ProviderContactActions({ phone, className = '', buttonClassName = '', compact = false, iconOnly = false }) {
   const digits = normalizeIndianPhone(phone)
-  const baseClass = `inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold transition sm:gap-2 sm:px-3 sm:text-sm ${buttonClassName}`
-  const labelClass = compact ? 'truncate' : ''
+  const iconClass = 'h-5 w-5 shrink-0'
+  const baseClass = `inline-flex h-10 min-w-0 items-center justify-center rounded-lg border text-xs font-bold transition sm:text-sm ${
+    iconOnly ? 'px-2' : 'gap-1.5 px-2 sm:gap-2 sm:px-3'
+  } ${buttonClassName}`
+  const labelClass = iconOnly ? 'sr-only' : compact ? 'truncate' : ''
 
   if (!digits) {
     return (
-      <div className={`grid grid-cols-3 gap-2 ${className}`}>
-        <DisabledContactButton><Phone className="h-4 w-4" /><span className={labelClass}>Call</span></DisabledContactButton>
-        <DisabledContactButton><WhatsAppIcon /><span className={labelClass}>WhatsApp</span></DisabledContactButton>
-        <DisabledContactButton><MessageCircle className="h-4 w-4" /><span className={labelClass}>Message</span></DisabledContactButton>
+      <div className={`grid grid-cols-3 gap-2 ${className}`} onClick={(event) => event.stopPropagation()}>
+        <DisabledContactButton><Phone className={iconClass} /><span className={labelClass}>Call</span></DisabledContactButton>
+        <DisabledContactButton><WhatsAppIcon className="h-6 w-6 shrink-0" /><span className={labelClass}>WhatsApp</span></DisabledContactButton>
+        <DisabledContactButton><MessageCircle className={iconClass} /><span className={labelClass}>Message</span></DisabledContactButton>
       </div>
     )
   }
 
   return (
-    <div className={`grid grid-cols-3 gap-2 ${className}`}>
-      <a href={`tel:+91${digits}`} className={`${baseClass} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
-        <Phone className="h-4 w-4" />
+    <div className={`grid grid-cols-3 gap-2 ${className}`} onClick={(event) => event.stopPropagation()}>
+      <a href={`tel:+91${digits}`} className={`${baseClass} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`} aria-label="Call provider" title="Call provider">
+        <Phone className={iconClass} />
         <span className={labelClass}>Call</span>
       </a>
       <a
@@ -48,12 +51,14 @@ function ProviderContactActions({ phone, className = '', buttonClassName = '', c
         target="_blank"
         rel="noreferrer"
         className={`${baseClass} border-green-200 bg-green-50 text-green-700 hover:bg-green-100`}
+        aria-label="WhatsApp provider"
+        title="WhatsApp provider"
       >
-        <WhatsAppIcon />
+        <WhatsAppIcon className="h-6 w-6 shrink-0" />
         <span className={labelClass}>WhatsApp</span>
       </a>
-      <a href={`sms:+91${digits}`} className={`${baseClass} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`}>
-        <MessageCircle className="h-4 w-4" />
+      <a href={`sms:+91${digits}`} className={`${baseClass} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`} aria-label="Message provider" title="Message provider">
+        <MessageCircle className={iconClass} />
         <span className={labelClass}>Message</span>
       </a>
     </div>

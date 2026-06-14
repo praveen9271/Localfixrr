@@ -83,7 +83,6 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/provider', providerRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api', bookingRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/uploads', uploadRoutes);
@@ -106,6 +105,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use('/api', bookingRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

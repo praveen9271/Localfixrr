@@ -58,6 +58,24 @@ const getShortcutCard = (category) => {
   };
 };
 
+const shortcutIconSize = {
+  wrench: "h-6 w-6",
+  bolt: "h-6 w-6",
+  snow: "h-6 w-6",
+  paint: "h-6 w-6",
+  spark: "h-7 w-7",
+  hammer: "h-6 w-6",
+};
+
+const mobileShortcutIconSize = {
+  wrench: "h-[18px] w-[18px]",
+  bolt: "h-[18px] w-[18px]",
+  snow: "h-[18px] w-[18px]",
+  paint: "h-[18px] w-[18px]",
+  spark: "h-[22px] w-[22px]",
+  hammer: "h-[18px] w-[18px]",
+};
+
 const heroSearchSchema = Yup.object({
   service: Yup.string().trim().required("Choose a service to search."),
 });
@@ -371,7 +389,7 @@ function Hero({ darkMode, onToast }) {
                   }`}
                 >
                   <span className={`grid h-10 w-10 place-items-center rounded-full ${darkMode ? card.darkTint : card.tint}`}>
-                    <Icon name={card.icon} className="h-5 w-5" />
+                    <Icon name={card.icon} className={shortcutIconSize[card.icon] || "h-6 w-6"} />
                   </span>
                 </span>
                 <span
@@ -399,7 +417,7 @@ function Hero({ darkMode, onToast }) {
                 aria-label={`Browse ${card.query} services`}
               >
                 <span className={`grid h-7 w-7 place-items-center rounded-full ${darkMode ? card.darkTint : card.tint}`}>
-                  <Icon name={card.icon} className="h-3.5 w-3.5" />
+                  <Icon name={card.icon} className={mobileShortcutIconSize[card.icon] || "h-[18px] w-[18px]"} />
                 </span>
                 <span className={`mt-1 text-[0.56rem] font-black leading-tight ${darkMode ? "text-white" : "text-slate-900"}`}>
                   {card.title}

@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormik } from 'formik'
-import { CheckCircle2, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import * as Yup from 'yup'
 import {
@@ -27,13 +27,22 @@ import { formatCurrency, formatDate, getLocalDateTimeInputValue } from '../utils
 import { SERVICE_CATEGORY_OPTIONS } from '../constants/serviceCategories'
 import useDebounce from '../hooks/useDebounce'
 import useProfilePhotoActions from '../hooks/useProfilePhotoActions'
-import { getServiceItems, getStartingPrice } from '../utils/serviceItems'
+import {
+  getBookingServiceItemNames,
+  getSelectedServiceItems,
+  getSelectedServiceItemsTotal,
+  getServiceItemKey,
+  getServiceItems,
+  getStartingPrice,
+  toggleServiceItemId,
+} from '../utils/serviceItems'
 
 const CATEGORIES = SERVICE_CATEGORY_OPTIONS
 const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
 
 const bookingSchema = Yup.object({
+  serviceItemIds: Yup.array().min(1, 'Select at least one service item.'),
   date: Yup.string()
     .required('Preferred date and time is required.')
     .test('future-date', 'Please select today or a future date and time.', (value) => !value || new Date(value) >= new Date()),
@@ -144,7 +153,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
   }, [activeTab, loadServices])
 
   const bookingFormik = useFormik({
-    initialValues: { serviceItemId: '', date: '', address: user?.address || '', notes: '' },
+    initialValues: { serviceItemId: '', serviceItemIds: [], date: '', address: user?.address || '', notes: '' },
     validationSchema: bookingSchema,
     onSubmit: async (values, { resetForm }) => {
       if (!bookingService) return
@@ -152,13 +161,14 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
       try {
         await createBooking({
           serviceId: bookingService._id,
-          serviceItemId: values.serviceItemId,
+          serviceItemId: values.serviceItemIds[0] || values.serviceItemId,
+          serviceItemIds: values.serviceItemIds,
           date: values.date,
           address: values.address || user?.address || '',
           notes: values.notes,
         })
         setBookingService(null)
-        resetForm({ values: { serviceItemId: '', date: '', address: user?.address || '', notes: '' } })
+        resetForm({ values: { serviceItemId: '', serviceItemIds: [], date: '', address: user?.address || '', notes: '' } })
         showToast('Booking request sent')
         await loadDashboard()
       } catch (err) {
@@ -320,7 +330,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                     <tr key={booking._id} className="border-b border-slate-100">
                       <td className="py-3 pr-4">
                         <p className="font-semibold text-slate-900">{booking.service?.title}</p>
-                        {booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}
+                        {getBookingServiceItemNames(booking) && <p className="text-xs font-semibold text-slate-500">{getBookingServiceItemNames(booking)}</p>}
                       </td>
                       <td className="py-3 pr-4 text-slate-600">
                         <div className="flex min-w-0 items-center gap-3">
@@ -411,8 +421,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                 service={service}
                 phone={getProviderPhone(service)}
                 onBook={() => {
-                  const items = getServiceItems(service)
-                  bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: user?.address || '', notes: '' } })
+                  bookingFormik.resetForm({ values: { serviceItemId: '', serviceItemIds: [], date: '', address: user?.address || '', notes: '' } })
                   setBookingService(service)
                 }}
                 onDetails={() => viewServiceDetails(service)}
@@ -481,7 +490,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                   <tr key={booking._id} className="border-b border-slate-100">
                     <td className="py-3 pr-4">
                       <p className="font-semibold text-slate-900">{booking.service?.title}</p>
-                      {booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}
+                      {getBookingServiceItemNames(booking) && <p className="text-xs font-semibold text-slate-500">{getBookingServiceItemNames(booking)}</p>}
                     </td>
                     <td className="py-3 pr-4 text-slate-600">
                       <div className="flex min-w-0 items-center gap-3">
@@ -535,16 +544,20 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           {bookingService && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-black text-slate-900">Choose service package</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Select one item. This exact service will be sent to the provider.</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Select one or more items. These exact services will be sent to the provider.</p>
               <div className="mt-3 grid gap-2">
                 {getServiceItems(bookingService).map((item) => {
-                  const itemKey = item._id || item.name
-                  const active = bookingFormik.values.serviceItemId === itemKey
+                  const itemKey = getServiceItemKey(item)
+                  const active = bookingFormik.values.serviceItemIds.includes(itemKey)
                   return (
                     <button
                       key={itemKey}
                       type="button"
-                      onClick={() => bookingFormik.setFieldValue('serviceItemId', itemKey)}
+                      onClick={() => {
+                        const nextIds = toggleServiceItemId(bookingFormik.values.serviceItemIds, itemKey)
+                        bookingFormik.setFieldValue('serviceItemIds', nextIds)
+                        bookingFormik.setFieldValue('serviceItemId', nextIds[0] || '')
+                      }}
                       className={`flex w-full items-start gap-3 rounded-xl border bg-white p-3 text-left transition ${active ? 'border-indigo-500 ring-4 ring-indigo-50' : 'border-slate-200 hover:border-indigo-200'}`}
                     >
                       <input
@@ -567,13 +580,15 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                   )
                 })}
               </div>
+              {bookingFormik.touched.serviceItemIds && bookingFormik.errors.serviceItemIds && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.serviceItemIds}</span>
+              )}
               <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
                 <span className="font-bold text-slate-600">Final amount</span>
                 <span className="font-black text-slate-950">
-                  {formatCurrency(
-                    getServiceItems(bookingService).find((item) => (item._id || item.name) === bookingFormik.values.serviceItemId)?.price
-                      || getStartingPrice(bookingService),
-                  )}
+                  {formatCurrency(getSelectedServiceItems(bookingService, bookingFormik.values.serviceItemIds).length
+                    ? getSelectedServiceItemsTotal(bookingService, bookingFormik.values.serviceItemIds)
+                    : 0)}
                 </span>
               </div>
             </div>
@@ -627,7 +642,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
           </label>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving || getSelectedServiceItems(bookingService, bookingFormik.values.serviceItemIds).length === 0}>
               {saving ? 'Sending...' : 'Confirm Booking'}
             </Button>
           </div>
@@ -718,7 +733,8 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                     onClick={() => {
                       bookingFormik.resetForm({
                         values: {
-                          serviceItemId: item._id || item.name || '',
+                          serviceItemId: getServiceItemKey(item),
+                          serviceItemIds: getServiceItemKey(item) ? [getServiceItemKey(item)] : [],
                           date: '',
                           address: user?.address || '',
                           notes: '',
@@ -730,7 +746,12 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
                     className="flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition hover:border-indigo-100 hover:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-50"
                   >
                     <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-slate-700">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                      <input
+                        type="checkbox"
+                        readOnly
+                        tabIndex={-1}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 accent-indigo-600"
+                      />
                       <span className="truncate">{item.name}</span>
                     </span>
                     <span className="shrink-0 font-black text-indigo-700">{formatCurrency(item.price)}</span>
@@ -755,8 +776,7 @@ function UserDashboardNew({ defaultTab = 'dashboard' }) {
             
             <div className="flex justify-end">
               <Button onClick={() => {
-                const items = getServiceItems(selectedService)
-                bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: user?.address || '', notes: '' } })
+                bookingFormik.resetForm({ values: { serviceItemId: '', serviceItemIds: [], date: '', address: user?.address || '', notes: '' } })
                 setBookingService(selectedService)
                 setSelectedService(null)
               }}>

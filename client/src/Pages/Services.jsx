@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormik } from 'formik'
+import { X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import * as Yup from 'yup'
 import { createBooking, getPublicServices } from '../services/dashboardService'
@@ -14,7 +15,13 @@ import { SERVICE_AREA_FULL, isSupportedLocation, unsupportedLocationMessage } fr
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
 import useDebounce from '../hooks/useDebounce'
 import useProtectedBooking from '../hooks/useProtectedBooking'
-import { getServiceItems } from '../utils/serviceItems'
+import {
+  getSelectedServiceItems,
+  getSelectedServiceItemsTotal,
+  getServiceItemKey,
+  getServiceItems,
+  toggleServiceItemId,
+} from '../utils/serviceItems'
 import { formatCurrency, getLocalDateTimeInputValue } from '../utils/formatters'
 
 const CATEGORY_OPTIONS = SERVICE_CATEGORIES
@@ -51,6 +58,7 @@ const getProviderPhone = (service) =>
   String(service?.provider?.user?.phone || service?.provider?.phone || '').replace(/\D/g, '').slice(-10)
 
 const bookingSchema = Yup.object({
+  serviceItemIds: Yup.array().min(1, 'Select at least one service item.'),
   date: Yup.string()
     .required('Preferred date and time is required.')
     .test('future-date', 'Please select today or a future date and time.', (value) => !value || new Date(value) >= new Date()),
@@ -210,7 +218,7 @@ function Services() {
   }
 
   const bookingFormik = useFormik({
-    initialValues: { serviceItemId: '', date: '', address: getCurrentUser()?.address || '', notes: '' },
+    initialValues: { serviceItemId: '', serviceItemIds: [], date: '', address: getCurrentUser()?.address || '', notes: '' },
     validationSchema: bookingSchema,
     onSubmit: async (values, { resetForm }) => {
       if (!isAuthenticated()) {
@@ -225,13 +233,14 @@ function Services() {
       try {
         await createBooking({
           serviceId: bookingService._id,
-          serviceItemId: values.serviceItemId,
+          serviceItemId: values.serviceItemIds[0] || values.serviceItemId,
+          serviceItemIds: values.serviceItemIds,
           date: values.date,
           address: values.address,
           notes: values.notes,
         })
         setBookingService(null)
-        resetForm({ values: { serviceItemId: '', date: '', address: getCurrentUser()?.address || '', notes: '' } })
+        resetForm({ values: { serviceItemId: '', serviceItemIds: [], date: '', address: getCurrentUser()?.address || '', notes: '' } })
         showToast('Booking request sent')
       } catch (err) {
         showToast(err.response?.data?.message || 'Booking failed')
@@ -240,6 +249,14 @@ function Services() {
       }
     },
   })
+
+  const bookingSelectedItems = bookingService
+    ? getSelectedServiceItems(bookingService, bookingFormik.values.serviceItemIds)
+    : []
+  const bookingSelectedTotal = bookingService
+    ? getSelectedServiceItemsTotal(bookingService, bookingFormik.values.serviceItemIds)
+    : 0
+  const hasBookingSelectedItems = bookingSelectedItems.length > 0
 
   const togglePhone = (serviceId) => {
     setVisiblePhoneIds((current) =>
@@ -356,8 +373,7 @@ function Services() {
               phone={getProviderPhone(service)}
               onBook={() => {
                 requestBooking(() => {
-                  const items = getServiceItems(service)
-                  bookingFormik.resetForm({ values: { serviceItemId: items[0]?._id || items[0]?.name || '', date: '', address: getCurrentUser()?.address || '', notes: '' } })
+                  bookingFormik.resetForm({ values: { serviceItemId: '', serviceItemIds: [], date: '', address: getCurrentUser()?.address || '', notes: '' } })
                   setBookingService(service)
                 })
               }}
@@ -403,57 +419,84 @@ function Services() {
         </div>
       </Modal>
 
-      <Modal isOpen={Boolean(bookingService)} title={bookingService ? `Book ${bookingService.title}` : ''} onClose={() => setBookingService(null)}>
-          <form onSubmit={bookingFormik.handleSubmit}>
-            {bookingService && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-sm font-black text-slate-900">Choose service package</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">Select one item. This exact service will be sent to the provider.</p>
-                <div className="mt-3 grid gap-2">
-                  {getServiceItems(bookingService).map((item) => {
-                    const itemKey = item._id || item.name
-                    const selected = bookingFormik.values.serviceItemId === itemKey
-                    return (
-                      <button
-                        key={itemKey}
-                        type="button"
-                        onClick={() => bookingFormik.setFieldValue('serviceItemId', itemKey)}
-                        className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${selected ? 'border-indigo-500 bg-white ring-4 ring-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          readOnly
-                          tabIndex={-1}
-                          className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-indigo-600"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="font-bold text-slate-900">{item.name}</p>
-                            <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-sm font-black text-indigo-700">{formatCurrency(item.price)}</span>
-                          </div>
-                          <div>
-                            {item.description && <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>}
-                            {item.duration && <p className="mt-1 text-xs font-semibold text-slate-400">{item.duration}</p>}
-                            {selected && <p className="mt-2 text-xs font-black text-indigo-600">Selected for booking</p>}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
-                  <span className="font-bold text-slate-600">Final amount</span>
-                  <span className="font-black text-slate-950">
-                    {formatCurrency(
-                      getServiceItems(bookingService).find((item) => (item._id || item.name) === bookingFormik.values.serviceItemId)?.price
-                        || getServiceItems(bookingService)[0]?.price
-                        || 0,
-                    )}
-                  </span>
-                </div>
+      {bookingService && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4">
+          <form onSubmit={bookingFormik.handleSubmit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-500">Booking request</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-900">Book {bookingService.title}</h2>
+                <span className="mt-3 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
+                  {hasBookingSelectedItems ? formatCurrency(bookingSelectedTotal) : 'Select service'}
+                </span>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setBookingService(null)}
+                aria-label="Close booking form"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-4 focus:ring-indigo-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black text-slate-950">Choose service items</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">Select one or more services for this booking.</p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100">
+                  {bookingSelectedItems.length} selected
+                </span>
+              </div>
+
+              <div className="mt-4 grid max-h-72 gap-2 overflow-y-auto pr-1">
+                {getServiceItems(bookingService).map((item) => {
+                  const itemKey = getServiceItemKey(item)
+                  const selected = bookingFormik.values.serviceItemIds.includes(itemKey)
+                  return (
+                    <button
+                      key={itemKey}
+                      type="button"
+                      onClick={() => {
+                        const nextIds = toggleServiceItemId(bookingFormik.values.serviceItemIds, itemKey)
+                        bookingFormik.setFieldValue('serviceItemIds', nextIds)
+                        bookingFormik.setFieldValue('serviceItemId', nextIds[0] || '')
+                      }}
+                      className={`flex w-full items-start gap-3 rounded-xl border bg-white p-3 text-left transition ${selected ? 'border-indigo-500 ring-4 ring-indigo-50' : 'border-slate-200 hover:border-indigo-200'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        readOnly
+                        tabIndex={-1}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-indigo-600"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-black text-slate-900">{item.name}</p>
+                          <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-sm font-black text-indigo-700">{formatCurrency(item.price)}</span>
+                        </div>
+                        {item.description && <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>}
+                        {item.duration && <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{item.duration}</p>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {bookingFormik.touched.serviceItemIds && bookingFormik.errors.serviceItemIds && (
+                <span className="mt-2 block text-xs font-semibold text-rose-600">{bookingFormik.errors.serviceItemIds}</span>
+              )}
+
+              <div className="mt-4 flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm ring-1 ring-slate-200">
+                <span className="font-black text-slate-700">Final amount</span>
+                <span className={`font-black ${hasBookingSelectedItems ? 'text-slate-950' : 'text-slate-400'}`}>
+                  {hasBookingSelectedItems ? formatCurrency(bookingSelectedTotal) : 'Select items to calculate'}
+                </span>
+              </div>
+            </div>
             <label className="mt-5 block text-sm font-semibold text-slate-700">
               Preferred date and time <span className="text-rose-500">*</span>
               <input
@@ -503,13 +546,14 @@ function Services() {
             </label>
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBookingService(null)}>Cancel</Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving || !hasBookingSelectedItems}>
                 {saving && <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-                {saving ? 'Sending...' : 'Confirm Booking'}
+                {saving ? 'Sending...' : hasBookingSelectedItems ? 'Confirm Booking' : 'Select item to continue'}
               </Button>
             </div>
           </form>
-      </Modal>
+        </div>
+      )}
 
       <Toast message={toast} />
     </main>

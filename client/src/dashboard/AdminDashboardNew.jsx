@@ -77,7 +77,7 @@ import Toast from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../utils/formatters'
 import useDebounce from '../hooks/useDebounce'
 import usePagination from '../hooks/usePagination'
-import { getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
+import { getBookingServiceItemNames, getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
 
 const tabs = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard/admin', icon: LayoutDashboard },
@@ -663,7 +663,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
                   rowKey={(booking) => booking._id}
                   emptyTitle="No bookings yet"
                   columns={[
-                    { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}</div> },
+                    { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{getBookingServiceItemNames(booking) && <p className="text-xs font-semibold text-slate-500">{getBookingServiceItemNames(booking)}</p>}</div> },
                     { key: 'customer', label: 'Customer', render: (booking) => booking.customer?.name || '-' },
                     { key: 'amount', label: 'Amount', render: (booking) => formatCurrency(booking.totalAmount) },
                     { key: 'status', label: 'Status', render: (booking) => <Badge status={booking.status} /> },
@@ -875,7 +875,7 @@ function AdminDashboardNew({ defaultTab = 'dashboard' }) {
               loading={tableLoading}
               columns={[
                 { key: 'customer', label: 'Customer', render: (booking) => booking.customer?.name || '-' },
-                { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{booking.serviceItem?.name && <p className="text-xs font-semibold text-slate-500">{booking.serviceItem.name}</p>}</div> },
+                { key: 'service', label: 'Service', render: (booking) => <div><p className="font-bold text-slate-950">{booking.service?.title || '-'}</p>{getBookingServiceItemNames(booking) && <p className="text-xs font-semibold text-slate-500">{getBookingServiceItemNames(booking)}</p>}</div> },
                 { key: 'provider', label: 'Provider', render: (booking) => booking.provider?.businessName || booking.provider?.user?.name || '-' },
                 { key: 'date', label: 'Date', render: (booking) => formatDate(booking.date) },
                 { key: 'amount', label: 'Amount', render: (booking) => formatCurrency(booking.totalAmount) },

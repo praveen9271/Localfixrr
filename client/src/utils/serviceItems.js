@@ -87,6 +87,37 @@ export const getServiceItems = (service) => {
 export const getStartingPrice = (service) =>
   Math.min(...getServiceItems(service).map((item) => Number(item.price) || 0))
 
+export const getServiceItemKey = (item) => item?._id || item?.name || ''
+
+export const getSelectedServiceItems = (service, selectedIds = []) => {
+  const selectedSet = new Set(Array.isArray(selectedIds) ? selectedIds.map(String) : [])
+  return getServiceItems(service).filter((item) => selectedSet.has(String(getServiceItemKey(item))))
+}
+
+export const getSelectedServiceItemsTotal = (service, selectedIds = []) =>
+  getSelectedServiceItems(service, selectedIds)
+    .reduce((sum, item) => sum + (Number(item.price) || 0), 0)
+
+export const toggleServiceItemId = (selectedIds = [], itemId) => {
+  const cleanItemId = String(itemId || '')
+  if (!cleanItemId) return selectedIds
+  const selectedSet = new Set(selectedIds.map(String))
+  if (selectedSet.has(cleanItemId)) {
+    return selectedIds.filter((id) => String(id) !== cleanItemId)
+  }
+  return [...selectedIds, itemId]
+}
+
+export const getBookingServiceItems = (booking) => {
+  if (Array.isArray(booking?.serviceItems) && booking.serviceItems.length) {
+    return booking.serviceItems.filter((item) => item?.name)
+  }
+  return booking?.serviceItem?.name ? [booking.serviceItem] : []
+}
+
+export const getBookingServiceItemNames = (booking) =>
+  getBookingServiceItems(booking).map((item) => item.name).join(', ')
+
 export const makeBlankServiceItem = () => ({
   name: '',
   price: '',

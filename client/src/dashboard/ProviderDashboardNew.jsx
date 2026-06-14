@@ -32,7 +32,7 @@ import ProfileAvatar from '../components/profile/ProfileAvatar'
 import ProfilePhotoPanel from '../components/profile/ProfilePhotoPanel'
 import { formatCurrency, formatDateTime, formatStatus } from '../utils/formatters'
 import { SERVICE_CATEGORIES } from '../constants/serviceCategories'
-import { SERVICE_ITEM_TEMPLATES, getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
+import { SERVICE_ITEM_TEMPLATES, getBookingServiceItems, getServiceItems, makeBlankServiceItem } from '../utils/serviceItems'
 
 const blankService = {
   title: '',
@@ -528,15 +528,16 @@ function ProviderDashboardNew({ defaultTab = 'bookings' }) {
                     </td>
                     <td className="py-3 pr-4 text-slate-600">
                       <p className="font-semibold text-slate-900">{booking.service?.title}</p>
-                      {booking.serviceItem?.name && (
+                      {getBookingServiceItems(booking).length > 0 && (
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                          <span className="text-indigo-600">Booked: {booking.serviceItem.name}</span>
-                          {booking.serviceItem.price !== undefined && (
-                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
-                              {formatCurrency(booking.serviceItem.price)}
+                          <span className="text-indigo-600">
+                            Booked: {getBookingServiceItems(booking).map((item) => item.name).join(', ')}
+                          </span>
+                          {getBookingServiceItems(booking).map((item) => (
+                            <span key={`${booking._id}-${item.name}`} className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                              {formatCurrency(item.price)}
                             </span>
-                          )}
-                          {booking.serviceItem.duration && <span className="text-slate-500">{booking.serviceItem.duration}</span>}
+                          ))}
                         </div>
                       )}
                     </td>

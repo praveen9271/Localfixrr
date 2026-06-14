@@ -26,6 +26,12 @@ const normalizeApiUrl = (url) => {
 
 const getApiBaseUrl = () => {
   const { VITE_API_URL, VITE_LOCAL_API_URL } = import.meta.env
+  const useRemoteApi = String(import.meta.env.VITE_USE_REMOTE_API || '').toLowerCase() === 'true'
+
+  if (import.meta.env.DEV && !useRemoteApi) {
+    return normalizeApiUrl(VITE_LOCAL_API_URL)
+  }
+
   return normalizeApiUrl(VITE_API_URL || VITE_LOCAL_API_URL)
 }
 

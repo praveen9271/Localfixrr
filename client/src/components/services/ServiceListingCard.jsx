@@ -16,7 +16,6 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react'
-import StatusBadge from '../ui/StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import ProviderContactActions from './ProviderContactActions'
 import { getServiceItems, getStartingPrice } from '../../utils/serviceItems'
@@ -72,6 +71,7 @@ function ServiceListingCard({
   const titleMatchesProvider = normalizeCardText(service?.title) === normalizeCardText(providerName)
   const cardTitle = titleMatchesProvider ? providerName : service?.title || providerName || 'Service'
   const cardSubtitle = titleMatchesProvider ? `${category} Specialist` : category
+  const isAvailable = service?.provider?.available !== false
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -86,7 +86,8 @@ function ServiceListingCard({
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [menuOpen])
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action, event) => {
+    event?.stopPropagation()
     setMenuOpen(false)
     if (action === 'contact') {
       onContact?.(service)
@@ -96,26 +97,34 @@ function ServiceListingCard({
   }
 
   return (
-    <article className="group flex h-full min-h-[520px] cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_22px_55px_rgba(79,70,229,0.14)]">
+    <article
+      onClick={() => onDetails?.(service)}
+      className="group flex h-full min-h-[520px] cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_22px_55px_rgba(79,70,229,0.14)]"
+    >
       <div className="flex h-14 items-start justify-between gap-3">
-        <div className="flex min-w-0 gap-3">
+        <div className="flex min-w-0 flex-1 gap-3">
           <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 ${color}`}>
             <ServiceIcon className="h-6 w-6" />
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-black leading-6 text-slate-900" title={cardTitle}>{cardTitle}</h2>
-            <p className="mt-1 truncate text-sm font-semibold text-indigo-600" title={cardSubtitle}>{cardSubtitle}</p>
+            <div className="mt-1 flex min-w-0 items-center gap-2">
+              <p className="min-w-0 truncate text-sm font-semibold text-indigo-600" title={cardSubtitle}>{cardSubtitle}</p>
+              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${isAvailable ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-rose-200'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                {isAvailable ? 'Active' : 'Busy'}
+              </span>
+            </div>
           </div>
-        </div>
-
-        <div className="shrink-0 pt-0.5">
-          <StatusBadge status={service?.provider?.available === false ? 'inactive' : 'active'} />
         </div>
 
         <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
-            onClick={() => setMenuOpen((current) => !current)}
+            onClick={(event) => {
+              event.stopPropagation()
+              setMenuOpen((current) => !current)
+            }}
             className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
             aria-label="Open service actions"
             aria-expanded={menuOpen}
@@ -123,7 +132,7 @@ function ServiceListingCard({
             <MoreVertical className="h-5 w-5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-12 z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
+            <div className="absolute right-0 top-12 z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.18)]" onClick={(event) => event.stopPropagation()}>
               {showMenuDetails && (
                 <div className="mb-2 max-h-56 overflow-y-auto rounded-lg bg-slate-50 p-3 text-sm">
                   <p className="font-black text-slate-900">{cardTitle}</p>
@@ -146,7 +155,7 @@ function ServiceListingCard({
                 <button
                   key={action}
                   type="button"
-                  onClick={() => handleMenuAction(action)}
+                  onClick={(event) => handleMenuAction(action, event)}
                   className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-indigo-700"
                 >
                   <Icon className="h-4 w-4" />
@@ -165,7 +174,7 @@ function ServiceListingCard({
       <div className="mt-4 h-[130px] rounded-xl border border-slate-100 bg-slate-50 p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Included Services</p>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100">
             From {formatCurrency(startingPrice)}
           </span>
         </div>
@@ -176,7 +185,7 @@ function ServiceListingCard({
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                 <span className="truncate">{item.name}</span>
               </span>
-              <span className="shrink-0 font-black text-slate-900">{formatCurrency(item.price)}</span>
+              <span className="shrink-0 whitespace-nowrap font-black text-slate-900">{formatCurrency(item.price)}</span>
             </div>
           ))}
         </div>
@@ -204,7 +213,7 @@ function ServiceListingCard({
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Provider phone</p>
           {phone ? (
-            <a href={`tel:+91${phone}`} className="mt-1 inline-flex items-center gap-2 text-lg font-black text-emerald-800">
+            <a href={`tel:+91${phone}`} onClick={(event) => event.stopPropagation()} className="mt-1 inline-flex items-center gap-2 text-lg font-black text-emerald-800">
               +91 {phone}
             </a>
           ) : (
@@ -213,26 +222,32 @@ function ServiceListingCard({
         </div>
       )}
 
-      <ProviderContactActions phone={phone} className="mt-3" compact />
+      <ProviderContactActions phone={phone} className="mt-3" compact iconOnly />
 
       <div className="mt-auto grid grid-cols-2 gap-3 pt-4">
         <button
           type="button"
-          onClick={() => onDetails?.(service)}
-          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-200 px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDetails?.(service)
+          }}
+          className="inline-flex h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-indigo-200 px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
         >
           View Details
-          <ExternalLink className="h-4 w-4" />
+          <ExternalLink className="h-4 w-4 shrink-0" />
         </button>
         <button
           type="button"
           disabled={bookingDisabled}
-          onClick={() => onBook?.(service)}
-          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm shadow-indigo-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-600/30 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
+          onClick={(event) => {
+            event.stopPropagation()
+            onBook?.(service)
+          }}
+          className="inline-flex h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 text-sm font-bold text-white shadow-sm shadow-indigo-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-600/30 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
         >
           {bookingLoading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
           {bookingLoading ? 'Booking...' : primaryLabel}
-          {!bookingLoading && <ArrowRight className="h-4 w-4" />}
+          {!bookingLoading && <ArrowRight className="h-4 w-4 shrink-0" />}
         </button>
       </div>
     </article>

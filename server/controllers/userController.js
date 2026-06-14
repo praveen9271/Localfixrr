@@ -176,7 +176,7 @@ const getServiceById = async (req, res) => {
 // @access  User
 const createBooking = async (req, res) => {
   try {
-    const { serviceId, serviceItemId, date, notes, address } = req.body;
+    const { serviceId, serviceItemId, serviceItemIds, date, notes, address } = req.body;
     const cleanAddress = String(address || req.user?.address || '').trim();
     const cleanNotes = String(notes || '').trim();
 
@@ -233,13 +233,28 @@ const createBooking = async (req, res) => {
       price: service.price,
       title: service.title,
     });
-    const selectedItem = serviceItemId
-      ? serviceItems.find((item) => String(item._id) === String(serviceItemId) || item.name === serviceItemId)
-      : serviceItems[0];
+    const requestedItemIds = Array.isArray(serviceItemIds)
+      ? serviceItemIds
+      : serviceItemId
+        ? [serviceItemId]
+        : [];
+    const selectedItems = requestedItemIds
+      .map((itemId) => serviceItems.find((item) => String(item._id) === String(itemId) || item.name === itemId))
+      .filter(Boolean)
+      .filter((item, index, items) => items.findIndex((match) => String(match._id || match.name) === String(item._id || item.name)) === index);
+    const finalSelectedItems = selectedItems.length ? selectedItems : [serviceItems[0]].filter(Boolean);
+    const selectedItem = finalSelectedItems[0];
 
     if (!selectedItem) {
-      return res.status(400).json({ success: false, message: 'Please select a valid service item' });
+      return res.status(400).json({ success: false, message: 'Please select at least one valid service item' });
     }
+    const bookingServiceItems = finalSelectedItems.map((item) => ({
+      itemId: item._id,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      duration: item.duration,
+    }));
 
     const booking = await Booking.create({
       service: serviceId,
@@ -255,7 +270,8 @@ const createBooking = async (req, res) => {
         description: selectedItem.description,
         duration: selectedItem.duration,
       },
-      totalAmount: selectedItem.price
+      serviceItems: bookingServiceItems,
+      totalAmount: bookingServiceItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
     });
 
     await booking.populate('service', 'title category price serviceItems');

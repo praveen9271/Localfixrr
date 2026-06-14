@@ -97,25 +97,32 @@ function Home({ darkMode, onToast }) {
   const navigate = useNavigate()
   const [services, setServices] = useState([])
   const [servicesLoading, setServicesLoading] = useState(true)
+  const [servicesError, setServicesError] = useState('')
 
   useEffect(() => {
+    let isActive = true
     const controller = new AbortController()
 
-    const timer = setTimeout(async () => {
+    const loadServices = async () => {
       setServicesLoading(true)
+      setServicesError('')
       try {
         const data = await getPublicServices({ page: 1, limit: 4 }, { signal: controller.signal })
+        if (!isActive) return
         setServices(data.services || [])
       } catch (error) {
-        if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') return
+        if (!isActive || error.code === 'ERR_CANCELED' || error.name === 'CanceledError' || error.name === 'AbortError') return
         setServices([])
+        setServicesError(error.userMessage || error.response?.data?.message || 'Unable to load live services right now.')
       } finally {
-        if (!controller.signal.aborted) setServicesLoading(false)
+        if (isActive) setServicesLoading(false)
       }
-    }, 0)
+    }
+
+    loadServices()
 
     return () => {
-      clearTimeout(timer)
+      isActive = false
       controller.abort()
     }
   }, [])
@@ -219,14 +226,28 @@ function Home({ darkMode, onToast }) {
               showActionsMenu={false}
               primaryLabel="Book now"
               onDetails={(selected) => navigate(`/provider/${selected._id}`)}
-              onBook={(selected) => navigate(`/provider/${selected._id}`)}
+              onBook={(selected) => navigate(`/provider/${selected._id}`, { state: { openBooking: true } })}
               onContact={handleServiceContact}
               onMenuAction={handleServiceMenuAction}
             />
           ))}
           {!servicesLoading && topServices.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-6 text-center text-slate-500 xl:col-span-4">
-              No live services are available yet.
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center shadow-sm xl:col-span-4">
+              <p className="text-base font-black text-slate-900">
+                {servicesError ? 'Live services could not load' : 'No live services are available yet.'}
+              </p>
+              <p className="mx-auto mt-2 max-w-xl text-sm font-medium text-slate-500">
+                {servicesError || 'Please check again after providers add active services.'}
+              </p>
+              {servicesError && (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className={`${button3dSubtle} mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700`}
+                >
+                  Retry
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -41,6 +41,33 @@ const bookingSchema = new mongoose.Schema({
       default: '',
     },
   },
+  serviceItems: [
+    {
+      itemId: {
+        type: mongoose.Schema.Types.ObjectId,
+      },
+      name: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      price: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      description: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      duration: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+    },
+  ],
   status: {
     type: String,
     enum: ['pending', 'accepted', 'confirmed', 'rejected', 'in_progress', 'completed', 'cancelled'],
