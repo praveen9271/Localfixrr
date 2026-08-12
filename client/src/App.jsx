@@ -8,7 +8,6 @@ import Navbar from './component/Navbar'
 import RoleProtectedRoute from './component/RoleProtectedRoute'
 import DashboardLayout from './component/DashboardLayout'
 import Chatbot from './components/chatbot/Chatbot'
-import logo from './assets/logo.png'
 import { scrollToSection } from './utils/scroll'
 import { SERVICE_CATEGORIES } from './constants/serviceCategories'
 import {
@@ -139,7 +138,7 @@ function PageLoader({ fullscreen = false }) {
           <div className="absolute inset-0 rounded-full border-4 border-slate-200" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-600 border-r-sky-500 animate-[spin_0.9s_linear_infinite]" />
           <div className="grid h-16 w-16 place-items-center rounded-2xl border border-slate-200 bg-white shadow-[0_16px_36px_rgba(15,23,42,0.12)]">
-            <img src={logo} alt="LocalFixr" className="h-12 w-12 object-contain" />
+            <img src="/loader-logo.png" alt="LocalFixr" className="h-12 w-12 object-contain" />
           </div>
         </div>
         <p className="mt-5 text-sm font-bold uppercase tracking-[0.24em] text-indigo-600">LocalFixr</p>
