@@ -8,6 +8,7 @@ import Navbar from './component/Navbar'
 import RoleProtectedRoute from './component/RoleProtectedRoute'
 import DashboardLayout from './component/DashboardLayout'
 import Chatbot from './components/chatbot/Chatbot'
+import logo from './assets/logo.png'
 import { scrollToSection } from './utils/scroll'
 import { SERVICE_CATEGORIES } from './constants/serviceCategories'
 import {
@@ -40,6 +41,7 @@ const UserProfile = lazy(() => import('./dashboard/UserProfile'))
 
 const OTP_RESEND_COOLDOWN_SECONDS = 60
 const GOOGLE_SCRIPT_ID = 'google-identity-services'
+const MINIMUM_LOADER_MS = 900
 const PHONE_COUNTRY_CODES = [
   { code: '+91', label: 'IN +91' },
   { code: '+1', label: 'US +1' },
@@ -129,14 +131,19 @@ const loadGoogleIdentityScript = () =>
     document.head.appendChild(script)
   })
 
-function PageLoader() {
+function PageLoader({ fullscreen = false }) {
   return (
-    <div className="grid min-h-[60vh] place-items-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="h-4 w-28 animate-pulse rounded bg-indigo-100" />
-        <div className="mt-4 h-8 w-3/4 animate-pulse rounded bg-slate-200" />
-        <div className="mt-3 h-4 w-full animate-pulse rounded bg-slate-200" />
-        <div className="mt-2 h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+    <div className={`grid place-items-center bg-slate-50 px-4 ${fullscreen ? 'min-h-screen' : 'min-h-[60vh]'}`}>
+      <div className="flex flex-col items-center text-center">
+        <div className="relative grid h-24 w-24 place-items-center">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-200" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-600 border-r-sky-500 animate-[spin_0.9s_linear_infinite]" />
+          <div className="grid h-16 w-16 place-items-center rounded-2xl border border-slate-200 bg-white shadow-[0_16px_36px_rgba(15,23,42,0.12)]">
+            <img src={logo} alt="LocalFixr" className="h-12 w-12 object-contain" />
+          </div>
+        </div>
+        <p className="mt-5 text-sm font-bold uppercase tracking-[0.24em] text-indigo-600">LocalFixr</p>
+        <p className="mt-2 text-sm font-semibold text-slate-500">Loading...</p>
       </div>
     </div>
   )
@@ -972,7 +979,28 @@ function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [isWebsiteLoaded, setIsWebsiteLoaded] = useState(false)
+  const [hasMinimumLoaderTimePassed, setHasMinimumLoaderTimePassed] = useState(false)
   const toastTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (isWebsiteLoaded) return undefined
+
+    const handleLoad = () => setIsWebsiteLoaded(true)
+
+    if (document.readyState === 'complete') {
+      const timer = window.setTimeout(handleLoad, 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    window.addEventListener('load', handleLoad, { once: true })
+    return () => window.removeEventListener('load', handleLoad)
+  }, [isWebsiteLoaded])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHasMinimumLoaderTimePassed(true), MINIMUM_LOADER_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => () => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
@@ -1010,121 +1038,125 @@ function App() {
     }
   }
 
+  if (!isWebsiteLoaded || !hasMinimumLoaderTimePassed) {
+    return <PageLoader fullscreen />
+  }
+
   return (
-    <div className={darkMode ? darkAppShell : lightAppShell}>
-      <ScrollManager />
-      {!isDashboardRoute && (
-        <Navbar
-          darkMode={darkMode}
-          onToggleDarkMode={() => setDarkMode((current) => !current)}
-          onLoginClick={() => setIsLoginOpen(true)}
-          onRegisterClick={() => setIsRegisterOpen(true)}
-          onToast={showToast}
-        />
-      )}
-      <Suspense fallback={<PageLoader />}>
-      <Routes>
-        <Route path="/" element={<Home darkMode={darkMode} onToast={showToast} />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/reviews" element={<Reviews />} />
-        <Route path="/provider/:id" element={<ProviderDetails />} />
-        <Route path="/support/:slug" element={<SupportPage />} />
-        <Route path="/login" element={<Navigate to="/?login=1" replace />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/verify-otp" element={<VerifyOTP />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        
-        {/* Admin Dashboard Routes */}
-        <Route
-          path="/dashboard/admin/*"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin']}>
-              <DashboardLayout>
-                <Routes>
-                  <Route index element={<AdminDashboardNew defaultTab="dashboard" />} />
-                  <Route path="users" element={<AdminDashboardNew defaultTab="users" />} />
-                  <Route path="providers" element={<AdminDashboardNew defaultTab="providers" />} />
-                  <Route path="services" element={<AdminDashboardNew defaultTab="services" />} />
-                  <Route path="categories" element={<AdminDashboardNew defaultTab="categories" />} />
-                  <Route path="bookings" element={<AdminDashboardNew defaultTab="bookings" />} />
-                  <Route path="reviews" element={<AdminDashboardNew defaultTab="reviews" />} />
-                  <Route path="reports" element={<AdminDashboardNew defaultTab="reports" />} />
-                  <Route path="notifications" element={<AdminDashboardNew defaultTab="notifications" />} />
-                  <Route path="settings" element={<AdminDashboardNew defaultTab="settings" />} />
-                  <Route path="profile" element={<UserProfile />} />
-                </Routes>
-              </DashboardLayout>
-            </RoleProtectedRoute>
-          }
-        />
+    <Suspense fallback={<PageLoader fullscreen />}>
+      <div className={darkMode ? darkAppShell : lightAppShell}>
+        <ScrollManager />
+        {!isDashboardRoute && (
+          <Navbar
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode((current) => !current)}
+            onLoginClick={() => setIsLoginOpen(true)}
+            onRegisterClick={() => setIsRegisterOpen(true)}
+            onToast={showToast}
+          />
+        )}
+        <Routes>
+          <Route path="/" element={<Home darkMode={darkMode} onToast={showToast} />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/reviews" element={<Reviews />} />
+          <Route path="/provider/:id" element={<ProviderDetails />} />
+          <Route path="/support/:slug" element={<SupportPage />} />
+          <Route path="/login" element={<Navigate to="/?login=1" replace />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-otp" element={<VerifyOTP />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
+          {/* Admin Dashboard Routes */}
+          <Route
+            path="/dashboard/admin/*"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin']}>
+                <DashboardLayout>
+                  <Routes>
+                    <Route index element={<AdminDashboardNew defaultTab="dashboard" />} />
+                    <Route path="users" element={<AdminDashboardNew defaultTab="users" />} />
+                    <Route path="providers" element={<AdminDashboardNew defaultTab="providers" />} />
+                    <Route path="services" element={<AdminDashboardNew defaultTab="services" />} />
+                    <Route path="categories" element={<AdminDashboardNew defaultTab="categories" />} />
+                    <Route path="bookings" element={<AdminDashboardNew defaultTab="bookings" />} />
+                    <Route path="reviews" element={<AdminDashboardNew defaultTab="reviews" />} />
+                    <Route path="reports" element={<AdminDashboardNew defaultTab="reports" />} />
+                    <Route path="notifications" element={<AdminDashboardNew defaultTab="notifications" />} />
+                    <Route path="settings" element={<AdminDashboardNew defaultTab="settings" />} />
+                    <Route path="profile" element={<UserProfile />} />
+                  </Routes>
+                </DashboardLayout>
+              </RoleProtectedRoute>
+            }
+          />
 
-        {/* Provider Dashboard Routes */}
-        <Route
-          path="/dashboard/provider/*"
-          element={
-            <RoleProtectedRoute allowedRoles={['service_provider']}>
-              <DashboardLayout>
-                <Routes>
-                  <Route index element={<ProviderDashboardNew defaultTab="bookings" />} />
-                  <Route path="bookings" element={<ProviderDashboardNew defaultTab="bookings" />} />
-                  <Route path="services" element={<ProviderDashboardNew defaultTab="services" />} />
-                  <Route path="reviews" element={<ProviderDashboardNew defaultTab="reviews" />} />
-                  <Route path="profile" element={<ProviderDashboardNew defaultTab="profile" />} />
-                </Routes>
-              </DashboardLayout>
-            </RoleProtectedRoute>
-          }
-        />
+          {/* Provider Dashboard Routes */}
+          <Route
+            path="/dashboard/provider/*"
+            element={
+              <RoleProtectedRoute allowedRoles={['service_provider']}>
+                <DashboardLayout>
+                  <Routes>
+                    <Route index element={<ProviderDashboardNew defaultTab="bookings" />} />
+                    <Route path="bookings" element={<ProviderDashboardNew defaultTab="bookings" />} />
+                    <Route path="services" element={<ProviderDashboardNew defaultTab="services" />} />
+                    <Route path="reviews" element={<ProviderDashboardNew defaultTab="reviews" />} />
+                    <Route path="profile" element={<ProviderDashboardNew defaultTab="profile" />} />
+                  </Routes>
+                </DashboardLayout>
+              </RoleProtectedRoute>
+            }
+          />
 
-        {/* User Dashboard Routes */}
-        <Route
-          path="/dashboard/user/*"
-          element={
-            <RoleProtectedRoute allowedRoles={['user']}>
-              <DashboardLayout>
-                <Routes>
-                  <Route index element={<UserDashboardNew defaultTab="dashboard" />} />
-                  <Route path="services" element={<UserDashboardNew defaultTab="services" />} />
-                  <Route path="bookings" element={<UserDashboardNew defaultTab="bookings" />} />
-                  <Route path="profile" element={<UserProfile />} />
-                </Routes>
-              </DashboardLayout>
-            </RoleProtectedRoute>
-          }
-        />
+          {/* User Dashboard Routes */}
+          <Route
+            path="/dashboard/user/*"
+            element={
+              <RoleProtectedRoute allowedRoles={['user']}>
+                <DashboardLayout>
+                  <Routes>
+                    <Route index element={<UserDashboardNew defaultTab="dashboard" />} />
+                    <Route path="services" element={<UserDashboardNew defaultTab="services" />} />
+                    <Route path="bookings" element={<UserDashboardNew defaultTab="bookings" />} />
+                    <Route path="profile" element={<UserProfile />} />
+                  </Routes>
+                </DashboardLayout>
+              </RoleProtectedRoute>
+            }
+          />
 
-        {/* 404 Catch-all */}
-        <Route path="*" element={
-          <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-            <div className="text-center">
-              <h1 className="text-6xl font-black text-slate-900">404</h1>
-              <p className="mt-2 text-lg text-slate-600">Page not found.</p>
-              <a href="/" className="mt-4 inline-block rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700">Go Home</a>
+          {/* 404 Catch-all */}
+          <Route path="*" element={
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+              <div className="text-center">
+                <h1 className="text-6xl font-black text-slate-900">404</h1>
+                <p className="mt-2 text-lg text-slate-600">Page not found.</p>
+                <a href="/" className="mt-4 inline-block rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700">Go Home</a>
+              </div>
             </div>
+          } />
+        </Routes>
+        {!isDashboardRoute && <Footer onToast={showToast} />}
+        {!isDashboardRoute && <Chatbot />}
+        <LoginModal
+          isOpen={isLoginOpen || isLoginRequested}
+          onClose={handleLoginClose}
+          onToast={showToast}
+          onSwitchToRegister={handleSwitchToRegister}
+        />
+        <RegisterModal
+          isOpen={isRegisterOpen}
+          onClose={() => setIsRegisterOpen(false)}
+          onToast={showToast}
+          onSwitchToLogin={handleSwitchToLogin}
+        />
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[90] max-w-sm rounded-2xl bg-slate-950 px-5 py-4 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
+            {toast}
           </div>
-        } />
-      </Routes>
-      </Suspense>
-      {!isDashboardRoute && <Footer onToast={showToast} />}
-      {!isDashboardRoute && <Chatbot />}
-      <LoginModal
-        isOpen={isLoginOpen || isLoginRequested}
-        onClose={handleLoginClose}
-        onToast={showToast}
-        onSwitchToRegister={handleSwitchToRegister}
-      />
-      <RegisterModal
-        isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
-        onToast={showToast}
-        onSwitchToLogin={handleSwitchToLogin}
-      />
-      {toast && (
-        <div className="fixed bottom-5 right-5 z-[90] max-w-sm rounded-2xl bg-slate-950 px-5 py-4 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-          {toast}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </Suspense>
   )
 }
 
